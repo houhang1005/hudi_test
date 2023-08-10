@@ -18,6 +18,7 @@
 
 package org.apache.hudi.sink;
 
+import org.apache.flink.configuration.ConfigOption;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.util.Option;
@@ -59,12 +60,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -99,12 +95,15 @@ public class ITTestDataStreamWrite extends TestLogger {
 
   @ParameterizedTest
   @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
-  public void testWriteCopyOnWrite(String indexType) throws Exception {
+  public void testWriteCopyOnWrite(String indexType) throws Exception {//20230710
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.toURI().toString());
+    System.out.println("tempFile:"+tempFile.toURI().toString());///C:/Users/Lenovo/AppData/Local/Temp/junit1529009663229667238/ configuration
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);
     conf.setInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS, 1);
     conf.setString(FlinkOptions.INDEX_KEY_FIELD, "id");
     conf.setBoolean(FlinkOptions.PRE_COMBINE, true);
+    Iterator a = conf.keySet().iterator();
+    System.out.println(conf.getString(FlinkOptions.TABLE_TYPE));
 
     testWriteToHoodie(conf, "cow_write", 2, EXPECTED);
   }
@@ -212,10 +211,11 @@ public class ITTestDataStreamWrite extends TestLogger {
     RowType rowType =
         (RowType) AvroSchemaConverter.convertToDataType(StreamerUtil.getSourceSchema(conf))
             .getLogicalType();
-
+    //从文件里读取数据作为源
     String sourcePath = Objects.requireNonNull(Thread.currentThread()
         .getContextClassLoader().getResource("test_source.data")).toString();
 
+    System.out.println("___sourcePath___"+sourcePath);
     boolean isMor = conf.getString(FlinkOptions.TABLE_TYPE).equals(HoodieTableType.MERGE_ON_READ.name());
 
     DataStream<RowData> dataStream;
@@ -277,6 +277,8 @@ public class ITTestDataStreamWrite extends TestLogger {
 
     String sourcePath = Objects.requireNonNull(Thread.currentThread()
         .getContextClassLoader().getResource("test_source.data")).toString();
+
+    System.out.println("sourcePath:"+sourcePath);
 
     DataStream<RowData> dataStream = execEnv
         // use continuous file source to trigger checkpoint

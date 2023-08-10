@@ -18,6 +18,7 @@
 
 package org.apache.hudi.utils;
 
+import com.amazonaws.services.dynamodbv2.xspec.S;
 import org.apache.hudi.client.common.HoodieFlinkEngineContext;
 import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.fs.FSUtils;
@@ -690,6 +691,7 @@ public class TestData {
               ParquetReader<GenericRecord> reader = AvroParquetReader.<GenericRecord>builder(new Path(path)).build();
               GenericRecord nextRecord = reader.read();
               while (nextRecord != null) {
+                System.out.println("record value is "+nextRecord.toString());
                 readBuffer.add(extractor.apply(nextRecord));
                 nextRecord = reader.read();
               }
@@ -701,7 +703,7 @@ public class TestData {
       assertThat("Unexpected records number under partition: " + partition,
           readBuffer.size(), is(partitionDataSet.size()));
       for (String record : readBuffer) {
-        assertTrue(partitionDataSet.contains(record), "Unexpected record: " + record);
+        assertTrue(partitionDataSet.contains(record), "Unexpected record: " + record);//为true时不抛出异常
       }
     });
 

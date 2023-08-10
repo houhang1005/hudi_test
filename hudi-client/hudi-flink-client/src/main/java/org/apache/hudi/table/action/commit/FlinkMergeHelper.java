@@ -77,7 +77,7 @@ public class FlinkMergeHelper<T extends HoodieRecordPayload> extends BaseMergeHe
 
     final boolean externalSchemaTransformation = table.getConfig().shouldUseExternalSchemaTransformation();
     HoodieBaseFile baseFile = mergeHandle.baseFileForMerge();
-    if (externalSchemaTransformation || baseFile.getBootstrapBaseFile().isPresent()) {
+    if (externalSchemaTransformation || baseFile.getBootstrapBaseFile().isPresent()) {//false
       readSchema = baseFileReader.getSchema();
       gWriter = new GenericDatumWriter<>(readSchema);
       gReader = new GenericDatumReader<>(readSchema, mergeHandle.getWriterSchemaWithMetaFields());

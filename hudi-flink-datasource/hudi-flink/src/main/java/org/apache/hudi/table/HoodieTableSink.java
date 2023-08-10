@@ -61,8 +61,9 @@ public class HoodieTableSink implements DynamicTableSink, SupportsPartitioning, 
 
   @Override
   public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-    return (DataStreamSinkProviderAdapter) dataStream -> {
 
+    return (DataStreamSinkProviderAdapter) dataStream -> {
+      System.out.println("getSinkRuntimeProvider__");
       // setup configuration
       long ckpTimeout = dataStream.getExecutionEnvironment()
           .getCheckpointConfig().getCheckpointTimeout();
@@ -80,6 +81,7 @@ public class HoodieTableSink implements DynamicTableSink, SupportsPartitioning, 
 
       // Append mode
       if (OptionsResolver.isAppendMode(conf)) {
+        System.out.println("is append mode");
         DataStream<Object> pipeline = Pipelines.append(conf, rowType, dataStream, context.isBounded());
         if (OptionsResolver.needsAsyncClustering(conf)) {
           return Pipelines.cluster(conf, rowType, pipeline);
@@ -89,9 +91,9 @@ public class HoodieTableSink implements DynamicTableSink, SupportsPartitioning, 
       }
 
       DataStream<Object> pipeline;
-      // bootstrap
+      // bootstrap rowdata 2 hoodie
       final DataStream<HoodieRecord> hoodieRecordDataStream =
-          Pipelines.bootstrap(conf, rowType, dataStream, context.isBounded(), overwrite);
+          Pipelines.bootstrap(conf, rowType, dataStream, context.isBounded(), overwrite); //转为hoodierecord的流
       // write pipeline
       pipeline = Pipelines.hoodieStreamWrite(conf, hoodieRecordDataStream);
       // compaction

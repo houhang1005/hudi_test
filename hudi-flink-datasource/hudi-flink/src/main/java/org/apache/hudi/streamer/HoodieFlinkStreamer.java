@@ -56,6 +56,7 @@ public class HoodieFlinkStreamer {
       cmd.usage();
       System.exit(1);
     }
+    System.out.println("HoodieFlinkStreamer_set cp interval");
     env.enableCheckpointing(cfg.checkpointInterval);
     env.getConfig().setGlobalJobParameters(cfg);
     // We use checkpoint to trigger write operation, including instant generating and committing,

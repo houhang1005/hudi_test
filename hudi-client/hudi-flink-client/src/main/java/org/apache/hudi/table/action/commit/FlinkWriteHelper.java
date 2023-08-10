@@ -92,16 +92,16 @@ public class FlinkWriteHelper<T extends HoodieRecordPayload, R> extends BaseWrit
       List<HoodieRecord<T>> records, HoodieIndex<?, ?> index, int parallelism) {
     // If index used is global, then records are expected to differ in their partitionPath
     Map<Object, List<HoodieRecord<T>>> keyedRecords = records.stream()
-        .collect(Collectors.groupingBy(record -> record.getKey().getRecordKey()));
+        .collect(Collectors.groupingBy(record -> record.getKey().getRecordKey()));  //每个key对应一个hoodierecord的list
 
     return keyedRecords.values().stream().map(x -> x.stream().reduce((rec1, rec2) -> {
-      final T data1 = rec1.getData();
+      final T data1 = rec1.getData();//真实payload
       final T data2 = rec2.getData();
 
-      @SuppressWarnings("unchecked") final T reducedData = (T) data2.preCombine(data1, CollectionUtils.emptyProps());
+      @SuppressWarnings("unchecked") final T reducedData = (T) data2.preCombine(data1, CollectionUtils.emptyProps());//真正precombine 暂时不确定如何让配置的字段生效 只知道用指定字段更大的值来覆盖更小的那条
       // we cannot allow the user to change the key or partitionPath, since that will affect
       // everything
-      // so pick it from one of the records.
+      // so pick it from one of the records. 从precombine结果里的reduceData 找他的hoodiekey、hoodieoperation组成新的HoodieRecord
       boolean choosePrev = data1 == reducedData;
       HoodieKey reducedKey = choosePrev ? rec1.getKey() : rec2.getKey();
       HoodieOperation operation = choosePrev ? rec1.getOperation() : rec2.getOperation();

@@ -216,6 +216,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     return commitStats(instantTime, stats, extraMetadata, commitActionType, Collections.emptyMap());
   }
 
+  //注意本对象本身有hoodieHeartbeatClient实例
   public boolean commitStats(String instantTime, List<HoodieWriteStat> stats, Option<Map<String, String>> extraMetadata,
                              String commitActionType, Map<String, List<String>> partitionToReplaceFileIds) {
     // Skip the empty commit if not allowed
@@ -224,17 +225,17 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     }
     LOG.info("Committing " + instantTime + " action " + commitActionType);
     // Create a Hoodie table which encapsulated the commits and files visible
-    HoodieTable table = createTable(config, hadoopConf);
-    HoodieCommitMetadata metadata = CommitUtils.buildMetadata(stats, partitionToReplaceFileIds,
+    HoodieTable table = createTable(config, hadoopConf);//hoodieflinktable
+    HoodieCommitMetadata metadata = CommitUtils.buildMetadata(stats, partitionToReplaceFileIds,//有extra就也加入到
         extraMetadata, operationType, config.getWriteSchema(), commitActionType);
     HoodieInstant inflightInstant = new HoodieInstant(State.INFLIGHT, table.getMetaClient().getCommitActionType(), instantTime);
-    HeartbeatUtils.abortIfHeartbeatExpired(instantTime, table, heartbeatClient, config);
-    this.txnManager.beginTransaction(Option.of(inflightInstant),
+    HeartbeatUtils.abortIfHeartbeatExpired(instantTime, table, heartbeatClient, config);//heartbt如果过期了抛出exception
+    this.txnManager.beginTransaction(Option.of(inflightInstant),//涉及多个写入客户端时
         lastCompletedTxnAndMetadata.isPresent() ? Option.of(lastCompletedTxnAndMetadata.get().getLeft()) : Option.empty());
     try {
-      preCommit(inflightInstant, metadata);
+      preCommit(inflightInstant, metadata);//conflict resolution 不确认为何只有spark的
       commit(table, commitActionType, instantTime, metadata, stats);
-      postCommit(table, metadata, instantTime, extraMetadata);
+      postCommit(table, metadata, instantTime, extraMetadata); //用writemarker删除marker文件+instant踢出心跳
       LOG.info("Committed " + instantTime);
       releaseResources();
     } catch (IOException e) {
@@ -244,7 +245,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     }
 
     // trigger clean and archival.
-    // Each internal call should ensure to lock if required.
+    // Each internal call should ensure to lock if required. 每个cp都要检查触发一次 暂不确认lock具体含义
     mayBeCleanAndArchive(table);
     // We don't want to fail the commit if hoodie.fail.writes.on.inline.table.service.exception is false. We catch warn if false
     try {
@@ -257,7 +258,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
       LOG.warn("Inline compaction or clustering failed with exception: " + e.getMessage()
           + ". Moving further since \"hoodie.fail.writes.on.inline.table.service.exception\" is set to false.");
     }
-
+    //如果没有打开metric的开关则不管
     emitCommitMetrics(instantTime, metadata, commitActionType);
 
     // callback if needed.
@@ -275,15 +276,15 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     LOG.info("Committing " + instantTime + " action " + commitActionType);
     HoodieActiveTimeline activeTimeline = table.getActiveTimeline();
     // Finalize write
-    finalizeWrite(table, instantTime, stats);
-    // do save internal schema to support Implicitly add columns in write process
+    finalizeWrite(table, instantTime, stats);//涉及marker 暂不确认
+    // do save internal schema to support Implicitly add columns in write process 后续增加字段？
     if (!metadata.getExtraMetadata().containsKey(SerDeHelper.LATEST_SCHEMA)
         && metadata.getExtraMetadata().containsKey(SCHEMA_KEY) && table.getConfig().getSchemaEvolutionEnable()) {
       saveInternalSchema(table, instantTime, metadata);
     }
-    // update Metadata table
+    // update Metadata table 暂时不了解,大致是像一般hudi表一样先构建xxx_metadata表需要的配置
     writeTableMetadata(table, instantTime, commitActionType, metadata);
-    activeTimeline.saveAsComplete(new HoodieInstant(true, commitActionType, instantTime),
+    activeTimeline.saveAsComplete(new HoodieInstant(true, commitActionType, instantTime),//metadata的持久化 （写入.hoodie下）
         Option.of(metadata.toJsonString().getBytes(StandardCharsets.UTF_8)));
   }
 
@@ -349,6 +350,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
    * @param instantTime instant time of the commit.
    * @param actionType action type of the commit.
    * @param metadata instance of {@link HoodieCommitMetadata}.
+   *                 修改每一个元数据writer的状态 flink来说前提是开了metatable
    */
   protected void writeTableMetadata(HoodieTable table, String instantTime, String actionType, HoodieCommitMetadata metadata) {
     context.setJobStatus(this.getClass().getSimpleName(), "Committing to metadata table: " + config.getTableName());
@@ -544,7 +546,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   protected void postCommit(HoodieTable table, HoodieCommitMetadata metadata, String instantTime, Option<Map<String, String>> extraMetadata) {
     try {
       // Delete the marker directory for the instant.
-      WriteMarkersFactory.get(config.getMarkersType(), table, instantTime)
+      WriteMarkersFactory.get(config.getMarkersType(), table, instantTime)//marker具体文件和目录是什么？markertype是2选1
           .quietDeleteMarkerDir(context, config.getMarkersDeleteParallelism());
     } finally {
       this.heartbeatClient.stop(instantTime);
@@ -623,11 +625,11 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   protected void autoCleanOnCommit() {
-    if (!config.isAutoClean()) {
+    if (!config.isAutoClean()) {//可能需要配合手动清理
       return;
     }
 
-    if (config.isAsyncClean()) {
+    if (config.isAsyncClean()) {//默认false
       LOG.info("Async cleaner has been spawned. Waiting for it to finish");
       AsyncCleanerService.waitForCompletion(asyncCleanerService);
       LOG.info("Async cleaner has finished");
@@ -639,11 +641,11 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   protected void autoArchiveOnCommit(HoodieTable table) {
-    if (!config.isAutoArchive()) {
+    if (!config.isAutoArchive()) {//默认自动 即每次commit时要做一次
       return;
     }
 
-    if (config.isAsyncArchive()) {
+    if (config.isAsyncArchive()) {//是否异步 默认false
       LOG.info("Async archiver has been spawned. Waiting for it to finish");
       AsyncArchiveService.waitForCompletion(asyncArchiveService);
       LOG.info("Async archiver has finished");
@@ -788,7 +790,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
           // is set to false since they are already deleted.
           // Execute rollback
           HoodieRollbackMetadata rollbackMetadata = commitInstantOpt.isPresent()
-              ? table.rollback(context, rollbackInstantTime, commitInstantOpt.get(), true, skipLocking)
+              ? table.rollback(context, rollbackInstantTime, commitInstantOpt.get(), true, skipLocking)//进一步具体rollback
               : table.rollback(context, rollbackInstantTime, new HoodieInstant(
                   true, rollbackPlanOption.get().getInstantToRollback().getAction(), commitInstantTime),
               false, skipLocking);
@@ -874,26 +876,26 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
    * @param scheduleInline true if needs to be scheduled inline. false otherwise.
    * @param skipLocking if this is triggered by another parent transaction, locking can be skipped.
    */
-  public HoodieCleanMetadata clean(String cleanInstantTime, boolean scheduleInline, boolean skipLocking) throws HoodieIOException {
-    if (!tableServicesEnabled(config)) {
+  public HoodieCleanMetadata clean(String cleanInstantTime, boolean scheduleInline, boolean skipLocking) throws HoodieIOException { //true false
+    if (!tableServicesEnabled(config)) {//本身为true
       return null;
     }
     final Timer.Context timerContext = metrics.getCleanCtx();
-    CleanerUtils.rollbackFailedWrites(config.getFailedWritesCleanPolicy(),
+    CleanerUtils.rollbackFailedWrites(config.getFailedWritesCleanPolicy(),//默认EAGER 所以实际什么都没做 当为lazy时才执行rollbackFailedWrites()
         HoodieTimeline.CLEAN_ACTION, () -> rollbackFailedWrites());
 
     HoodieTable table = createTable(config, hadoopConf);
-    if (config.allowMultipleCleans() || !table.getActiveTimeline().getCleanerTimeline().filterInflightsAndRequested().firstInstant().isPresent()) {
+    if (config.allowMultipleCleans() || !table.getActiveTimeline().getCleanerTimeline().filterInflightsAndRequested().firstInstant().isPresent()) {//待确认 如何
       LOG.info("Cleaner started");
-      // proceed only if multiple clean schedules are enabled or if there are no pending cleans.
-      if (scheduleInline) {
-        scheduleTableServiceInternal(cleanInstantTime, Option.empty(), TableServiceType.CLEAN);
-        table.getMetaClient().reloadActiveTimeline();
+      // proceed only if multiple clean schedules are enabled or if there are no pending cleans.//没有执行中的clean 此时压缩计划应该也没有
+      if (scheduleInline) {//true
+        scheduleTableServiceInternal(cleanInstantTime, Option.empty(), TableServiceType.CLEAN);//返回新clean计划的instanttime 到此
+        table.getMetaClient().reloadActiveTimeline();//刷新instant 其实就是新增clean.request后刷新activeinstant集合
       }
     }
 
     // Proceeds to execute any requested or inflight clean instances in the timeline
-    HoodieCleanMetadata metadata = table.clean(context, cleanInstantTime);
+    HoodieCleanMetadata metadata = table.clean(context, cleanInstantTime);//进入clean具体逻辑
     if (timerContext != null && metadata != null) {
       long durationMs = metrics.getDurationInMs(timerContext.stop());
       metrics.updateCleanMetrics(durationMs, metadata.getTotalFilesDeleted());
@@ -905,7 +907,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   }
 
   public HoodieCleanMetadata clean() {
-    return clean(HoodieActiveTimeline.createNewInstantTime());
+    return clean(HoodieActiveTimeline.createNewInstantTime());//.clean这个元数据文件搞个新instant
   }
 
   /**
@@ -961,7 +963,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
   public String startCommit(String actionType, HoodieTableMetaClient metaClient) {
     CleanerUtils.rollbackFailedWrites(config.getFailedWritesCleanPolicy(),
         HoodieTimeline.COMMIT_ACTION, () -> rollbackFailedWrites());
-    String instantTime = HoodieActiveTimeline.createNewInstantTime();
+    String instantTime = HoodieActiveTimeline.createNewInstantTime();//开始搞个新的合适的instantTime
     startCommit(instantTime, actionType, metaClient);
     return instantTime;
   }
@@ -992,21 +994,22 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     startCommit(instantTime, actionType, metaClient);
   }
 
+  //暂时没确认最重要的问题 这个lazy触发了hb后怎么用 或者怎么实现不冲突
   private void startCommit(String instantTime, String actionType, HoodieTableMetaClient metaClient) {
     LOG.info("Generate a new instant time: " + instantTime + " action: " + actionType);
     // if there are pending compactions, their instantTime must not be greater than that of this instant time
     metaClient.getActiveTimeline().filterPendingCompactionTimeline().lastInstant().ifPresent(latestPending ->
-        ValidationUtils.checkArgument(
+        ValidationUtils.checkArgument(//要求这里当前已经存在的最大的压缩的 && active的instant 比上一轮产生的新instant小
             HoodieTimeline.compareTimestamps(latestPending.getTimestamp(), HoodieTimeline.LESSER_THAN, instantTime),
         "Latest pending compaction instant time must be earlier than this instant time. Latest Compaction :"
             + latestPending + ",  Ingesting at " + instantTime));
-    if (config.getFailedWritesCleanPolicy().isLazy()) {
+    if (config.getFailedWritesCleanPolicy().isLazy()) {//heartbeat那边有个map 保存每个添加的instant和他的心跳信息
       this.heartbeatClient.start(instantTime);
     }
 
-    if (actionType.equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {
+    if (actionType.equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {//如果是cluster
       metaClient.getActiveTimeline().createRequestedReplaceCommit(instantTime, actionType);
-    } else {
+    } else {//创建出新hoodieinstant然后也创建对应的.hoodie元数据文件
       metaClient.getActiveTimeline().createNewInstant(new HoodieInstant(HoodieInstant.State.REQUESTED, actionType,
               instantTime));
     }
@@ -1197,10 +1200,10 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
    */
   protected Boolean rollbackFailedWrites(boolean skipLocking) {
     HoodieTable<T, I, K, O> table = createTable(config, hadoopConf);
-    List<String> instantsToRollback = getInstantsToRollback(table.getMetaClient(), config.getFailedWritesCleanPolicy(), Option.empty());
+    List<String> instantsToRollback = getInstantsToRollback(table.getMetaClient(), config.getFailedWritesCleanPolicy(), Option.empty());//
     Map<String, Option<HoodiePendingRollbackInfo>> pendingRollbacks = getPendingRollbackInfos(table.getMetaClient());
     instantsToRollback.forEach(entry -> pendingRollbacks.putIfAbsent(entry, Option.empty()));
-    rollbackFailedWrites(pendingRollbacks, skipLocking);
+    rollbackFailedWrites(pendingRollbacks, skipLocking);//具体触发rollback
     return !pendingRollbacks.isEmpty();
   }
 
@@ -1208,7 +1211,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     // sort in reverse order of commit times
     LinkedHashMap<String, Option<HoodiePendingRollbackInfo>> reverseSortedRollbackInstants = instantsToRollback.entrySet()
         .stream().sorted((i1, i2) -> i2.getKey().compareTo(i1.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));//再次reverse
     for (Map.Entry<String, Option<HoodiePendingRollbackInfo>> entry : reverseSortedRollbackInstants.entrySet()) {
       if (HoodieTimeline.compareTimestamps(entry.getKey(), HoodieTimeline.LESSER_THAN_OR_EQUALS,
           HoodieTimeline.FULL_BOOTSTRAP_INSTANT_TS)) {
@@ -1229,7 +1232,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     if (cleaningPolicy.isEager()) {
       return inflightInstantsStream.map(HoodieInstant::getTimestamp).filter(entry -> {
         if (curInstantTime.isPresent()) {
-          return !entry.equals(curInstantTime.get());
+          return !entry.equals(curInstantTime.get());//和当前时间对不上则需要rollback
         } else {
           return true;
         }
@@ -1377,7 +1380,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
       case CLEAN:
         LOG.info("Scheduling cleaning at instant time :" + instantTime);
         Option<HoodieCleanerPlan> cleanerPlan = createTable(config, hadoopConf)
-            .scheduleCleaning(context, instantTime, extraMetadata);
+            .scheduleCleaning(context, instantTime, extraMetadata);//
         return cleanerPlan.isPresent() ? Option.of(instantTime) : Option.empty();
       default:
         throw new IllegalArgumentException("Invalid TableService " + tableServiceType);

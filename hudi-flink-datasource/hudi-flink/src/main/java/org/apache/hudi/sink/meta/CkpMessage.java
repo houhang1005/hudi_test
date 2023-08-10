@@ -46,7 +46,7 @@ public class CkpMessage implements Serializable, Comparable<CkpMessage> {
     this.state = State.valueOf(state);
   }
 
-  public CkpMessage(FileStatus fileStatus) {
+  public CkpMessage(FileStatus fileStatus) {//从给定的FileStatus提取出instant和state assert这里的filename中只有一个. 例如20230704150211234.inflight
     String fileName = fileStatus.getPath().getName();
     String[] nameAndExt = fileName.split("\\.");
     ValidationUtils.checkState(nameAndExt.length == 2);

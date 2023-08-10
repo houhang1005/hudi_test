@@ -145,6 +145,7 @@ public class HoodiePipeline {
 
     public DataStreamSink<?> sink(DataStream<RowData> input, boolean bounded) {
       TableDescriptor tableDescriptor = getTableDescriptor();
+      System.out.println("第一站__sink()");
       return HoodiePipeline.sink(input, tableDescriptor.getTableId(), tableDescriptor.getResolvedCatalogTable(), bounded);
     }
 
@@ -226,6 +227,7 @@ public class HoodiePipeline {
   private static DataStreamSink<?> sink(DataStream<RowData> input, ObjectIdentifier tablePath, ResolvedCatalogTable catalogTable, boolean isBounded) {
     FactoryUtil.DefaultDynamicTableContext context = Utils.getTableContext(tablePath, catalogTable, Configuration.fromMap(catalogTable.getOptions()));
     HoodieTableFactory hoodieTableFactory = new HoodieTableFactory();
+    System.out.println("hoodiePipeline.sink ");
     return ((DataStreamSinkProvider) hoodieTableFactory.createDynamicTableSink(context)
         .getSinkRuntimeProvider(new SinkRuntimeProviderContext(isBounded)))
         .consumeDataStream(input);

@@ -66,7 +66,7 @@ public class HoodieHeartbeatClient implements AutoCloseable, Serializable {
     ValidationUtils.checkArgument(heartbeatIntervalInMs >= 1000, "Cannot set heartbeat lower than 1 second");
     this.fs = fs;
     this.basePath = basePath;
-    this.heartbeatFolderPath = HoodieTableMetaClient.getHeartbeatFolderPath(basePath);
+    this.heartbeatFolderPath = HoodieTableMetaClient.getHeartbeatFolderPath(basePath);//  xxx/.hoodie/.heartbeat
     this.heartbeatIntervalInMs = heartbeatIntervalInMs;
     this.numTolerableHeartbeatMisses = numTolerableHeartbeatMisses;
     this.maxAllowableHeartbeatIntervalInMs = this.heartbeatIntervalInMs * this.numTolerableHeartbeatMisses;
@@ -163,19 +163,19 @@ public class HoodieHeartbeatClient implements AutoCloseable, Serializable {
    */
   public void start(String instantTime) {
     LOG.info("Received request to start heartbeat for instant time " + instantTime);
-    Heartbeat heartbeat = instantToHeartbeatMap.get(instantTime);
+    Heartbeat heartbeat = instantToHeartbeatMap.get(instantTime);//被标记过已经停过的心跳不能恢复
     ValidationUtils.checkArgument(heartbeat == null || !heartbeat.isHeartbeatStopped(), "Cannot restart a stopped heartbeat for " + instantTime);
     if (heartbeat != null && heartbeat.isHeartbeatStarted()) {
-      // heartbeat already started, NO_OP
+      // heartbeat already started, NO_OP 已经有正常心跳那就啥都不做
     } else {
       Heartbeat newHeartbeat = new Heartbeat();
       newHeartbeat.setHeartbeatStarted(true);
-      instantToHeartbeatMap.put(instantTime, newHeartbeat);
+      instantToHeartbeatMap.put(instantTime, newHeartbeat);//先放入map
       // Ensure heartbeat is generated for the first time with this blocking call.
       // Since timer submits the task to a thread, no guarantee when that thread will get CPU
       // cycles to generate the first heartbeat.
       updateHeartbeat(instantTime);
-      newHeartbeat.getTimer().scheduleAtFixedRate(new HeartbeatTask(instantTime), this.heartbeatIntervalInMs,
+      newHeartbeat.getTimer().scheduleAtFixedRate(new HeartbeatTask(instantTime), this.heartbeatIntervalInMs,//按照间隔调用HeartbeatTask.run
           this.heartbeatIntervalInMs);
     }
   }
@@ -253,8 +253,8 @@ public class HoodieHeartbeatClient implements AutoCloseable, Serializable {
   private void updateHeartbeat(String instantTime) throws HoodieHeartbeatException {
     try {
       Long newHeartbeatTime = System.currentTimeMillis();
-      OutputStream outputStream =
-          this.fs.create(new Path(heartbeatFolderPath + Path.SEPARATOR + instantTime), true);
+      OutputStream outputStream =//暂时不确认为何有hdfs的操作 但是实际看似没有heartbt信息写入hdfs
+          this.fs.create(new Path(heartbeatFolderPath + Path.SEPARATOR + instantTime), true);//在heartbeat目录下有很多instant的目录
       outputStream.close();
       Heartbeat heartbeat = instantToHeartbeatMap.get(instantTime);
       if (heartbeat.getLastHeartbeatTime() != null && isHeartbeatExpired(instantTime)) {

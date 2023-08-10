@@ -154,8 +154,8 @@ public class HoodieInstant implements Serializable, Comparable<HoodieInstant> {
           : HoodieTimeline.makeSavePointFileName(timestamp);
     } else if (HoodieTimeline.DELTA_COMMIT_ACTION.equals(action)) {
       return isInflight() ? HoodieTimeline.makeInflightDeltaFileName(timestamp)
-          : isRequested() ? HoodieTimeline.makeRequestedDeltaFileName(timestamp)
-              : HoodieTimeline.makeDeltaFileName(timestamp);
+          : isRequested() ? HoodieTimeline.makeRequestedDeltaFileName(timestamp)//20230707161922123.DELTACOMMIT.INFLIGHT
+              : HoodieTimeline.makeDeltaFileName(timestamp); //20230707161922123.COMMIT
     } else if (HoodieTimeline.COMPACTION_ACTION.equals(action)) {
       if (isInflight()) {
         return HoodieTimeline.makeInflightCompactionFileName(timestamp);

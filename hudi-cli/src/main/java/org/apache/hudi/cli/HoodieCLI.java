@@ -18,6 +18,7 @@
 
 package org.apache.hudi.cli;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hudi.cli.utils.SparkTempViewProvider;
 import org.apache.hudi.cli.utils.TempViewProvider;
 import org.apache.hudi.common.fs.ConsistencyGuardConfig;
@@ -81,10 +82,12 @@ public class HoodieCLI {
   public static void initFS(boolean force) throws IOException {
     if (fs == null || force) {
       fs = (tableMetadata != null) ? tableMetadata.getFs() : FileSystem.get(conf);
+      System.out.println("_1_1_ geturi:"+fs.getUri().toString());
     }
   }
 
   public static void refreshTableMetadata() {
+    System.out.println("_1_1_refreshTableMetadata()");
     setTableMetaClient(HoodieTableMetaClient.builder().setConf(HoodieCLI.conf).setBasePath(basePath).setLoadActiveTimelineOnLoad(false).setConsistencyGuardConfig(HoodieCLI.consistencyGuardConfig)
         .setLayoutVersion(Option.of(layoutVersion)).build());
   }

@@ -112,7 +112,7 @@ public abstract class BaseRollbackActionExecutor<T extends HoodieRecordPayload, 
         Option.of(rollbackTimer.endTimer()),
         Collections.singletonList(instantToRollback),
         stats);
-    finishRollback(inflightInstant, rollbackMetadata);
+    finishRollback(inflightInstant, rollbackMetadata);//本质需要删除相关inflight或者request元数据文件
 
     // Finally, remove the markers post rollback.
     WriteMarkersFactory.get(config.getMarkersType(), table, instantToRollback.getTimestamp())
@@ -125,13 +125,13 @@ public abstract class BaseRollbackActionExecutor<T extends HoodieRecordPayload, 
   public HoodieRollbackMetadata execute() {
     table.getMetaClient().reloadActiveTimeline();
     Option<HoodieInstant> rollbackInstant = table.getRollbackTimeline()
-        .filterInflightsAndRequested()
-        .filter(instant -> instant.getTimestamp().equals(instantTime))
+        .filterInflightsAndRequested()//只要非complete的
+        .filter(instant -> instant.getTimestamp().equals(instantTime))//非当前时间的 大概率也就一个.inflight或者.requested的
         .firstInstant();
     if (!rollbackInstant.isPresent()) {
       throw new HoodieRollbackException("No pending rollback instants found to execute rollback");
     }
-    try {
+    try {//rollback的执行计划
       HoodieRollbackPlan rollbackPlan = RollbackUtils.getRollbackPlan(table.getMetaClient(), rollbackInstant.get());
       return runRollback(table, rollbackInstant.get(), rollbackPlan);
     } catch (IOException e) {

@@ -995,7 +995,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
   }
 
   protected boolean needCreateTempFile() {
-    return HDFS.getScheme().equals(fileSystem.getScheme());
+    return HDFS.getScheme().equals(fileSystem.getUri().getScheme());
   }
 
   /**
@@ -1012,7 +1012,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
     FSDataOutputStream fsout = null;
     Path tmpPath = null;
 
-    boolean needTempFile = needCreateTempFile();
+    boolean needTempFile = needCreateTempFile();//HDFS 为true
 
     try {
       if (!content.isPresent()) {
@@ -1021,9 +1021,9 @@ public class HoodieWrapperFileSystem extends FileSystem {
 
       if (content.isPresent() && needTempFile) {
         Path parent = fullPath.getParent();
-        tmpPath = new Path(parent, fullPath.getName() + TMP_PATH_POSTFIX);
+        tmpPath = new Path(parent, fullPath.getName() + TMP_PATH_POSTFIX);// xxx/.hoodie/20230707162933567.commit.tmp
         fsout = fileSystem.create(tmpPath, false);
-        fsout.write(content.get());
+        fsout.write(content.get()); //把content写入.tmp的文件
       }
 
       if (content.isPresent() && !needTempFile) {
@@ -1043,7 +1043,7 @@ public class HoodieWrapperFileSystem extends FileSystem {
         throw new HoodieIOException(errorMsg, e);
       }
 
-      try {
+      try {//最后有tmp的全部改名为去掉tmp的
         if (null != tmpPath) {
           fileSystem.rename(tmpPath, fullPath);
         }

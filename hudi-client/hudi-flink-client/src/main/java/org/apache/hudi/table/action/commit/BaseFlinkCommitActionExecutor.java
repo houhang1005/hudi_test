@@ -105,7 +105,7 @@ public abstract class BaseFlinkCommitActionExecutor<T extends HoodieRecordPayloa
     final BucketType bucketType = record.getCurrentLocation().getInstantTime().equals("I")
         ? BucketType.INSERT
         : BucketType.UPDATE;
-    handleUpsertPartition(
+    handleUpsertPartition( //iterator里每个元素都写入writeStatuses这个list
         instantTime,
         partitionPath,
         fileId,

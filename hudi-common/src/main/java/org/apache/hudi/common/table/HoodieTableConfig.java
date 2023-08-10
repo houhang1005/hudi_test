@@ -299,7 +299,9 @@ public class HoodieTableConfig extends HoodieConfig {
 
   private void fetchConfigs(FileSystem fs, String metaPath) throws IOException {
     Path cfgPath = new Path(metaPath, HOODIE_PROPERTIES_FILE);
+    LOG.info("cfgPath__:"+cfgPath.toString());
     try (FSDataInputStream is = fs.open(cfgPath)) {
+      LOG.info("fs__:"+fs.getUri().toString());
       props.load(is);
     } catch (IOException ioe) {
       if (!fs.exists(cfgPath)) {

@@ -169,8 +169,8 @@ public class HoodieMetrics {
 
   public void updateCommitMetrics(long commitEpochTimeInMs, long durationInMs, HoodieCommitMetadata metadata,
       String actionType) {
-    updateCommitTimingMetrics(commitEpochTimeInMs, durationInMs, metadata, actionType);
-    if (config.isMetricsOn()) {
+    updateCommitTimingMetrics(commitEpochTimeInMs, durationInMs, metadata, actionType);//配置开了才做
+    if (config.isMetricsOn()) {//配置开了才做
       long totalPartitionsWritten = metadata.fetchTotalPartitionsWritten();
       long totalFilesInsert = metadata.fetchTotalFilesInsert();
       long totalFilesUpdate = metadata.fetchTotalFilesUpdated();

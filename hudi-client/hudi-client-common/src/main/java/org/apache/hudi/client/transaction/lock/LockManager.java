@@ -70,7 +70,7 @@ public class LockManager implements Serializable, AutoCloseable {
       while (retryCount <= maxRetries) {
         try {
           metrics.startLockApiTimerContext();
-          acquired = lockProvider.tryLock(writeConfig.getLockAcquireWaitTimeoutInMs(), TimeUnit.MILLISECONDS);
+          acquired = lockProvider.tryLock(writeConfig.getLockAcquireWaitTimeoutInMs(), TimeUnit.MILLISECONDS);//如果获取了锁 则返回true
           if (acquired) {
             metrics.updateLockAcquiredMetric();
             break;

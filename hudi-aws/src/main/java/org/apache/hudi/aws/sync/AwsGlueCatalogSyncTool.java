@@ -25,7 +25,7 @@ import org.apache.hudi.hive.HiveSyncTool;
 
 import com.beust.jcommander.JCommander;
 import org.apache.hadoop.conf.Configuration;
-
+import org.apache.log4j.LogManager;
 import java.util.Properties;
 
 import static org.apache.hudi.sync.common.HoodieSyncConfig.META_SYNC_BASE_PATH;

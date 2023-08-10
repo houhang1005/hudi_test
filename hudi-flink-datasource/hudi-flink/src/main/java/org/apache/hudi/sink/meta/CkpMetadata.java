@@ -79,7 +79,7 @@ public class CkpMetadata implements Serializable {
 
   private CkpMetadata(FileSystem fs, String basePath) {
     this.fs = fs;
-    this.path = new Path(ckpMetaPath(basePath));
+    this.path = new Path(ckpMetaPath(basePath));//嵌套过ckp_meta的路径
   }
 
   public void close() {
@@ -116,7 +116,7 @@ public class CkpMetadata implements Serializable {
       this.instantCache = new ArrayList<>();
     }
     this.instantCache.add(newInstant);
-    if (instantCache.size() > MAX_RETAIN_CKP_NUM) {
+    if (instantCache.size() > MAX_RETAIN_CKP_NUM) {//每次只删除最老的那个instant
       final String instant = instantCache.get(0);
       boolean[] error = new boolean[1];
       CkpMessage.getAllFileNames(instant).stream().map(this::fullPath).forEach(path -> {
@@ -165,7 +165,7 @@ public class CkpMetadata implements Serializable {
 
   private void load() {
     try {
-      this.messages = scanCkpMetadata(this.path);
+      this.messages = scanCkpMetadata(this.path);//path是一个AUXILIARYFOLDER下的ckp目录
     } catch (IOException e) {
       throw new HoodieException("Exception while scanning the checkpoint meta files under path: " + this.path, e);
     }
@@ -175,13 +175,13 @@ public class CkpMetadata implements Serializable {
   public String lastPendingInstant() {
     load();
     if (this.messages.size() > 0) {
-      CkpMessage ckpMsg = this.messages.get(this.messages.size() - 1);
+      CkpMessage ckpMsg = this.messages.get(this.messages.size() - 1);//获取最后一个CkpMessage 提前排序锅
       // consider 'aborted' as pending too to reuse the instant
-      if (!ckpMsg.isComplete()) {
+      if (!ckpMsg.isComplete()) { //最后一个只要是abort或者inflight的都满足返回 只有completed不算pending
         return ckpMsg.getInstant();
       }
     }
-    return null;
+    return null;//最后一个CkpMessage如果不是pending的instant 就返回个空的string
   }
 
   public List<CkpMessage> getMessages() {
@@ -218,16 +218,18 @@ public class CkpMetadata implements Serializable {
     return new Path(path, fileName);
   }
 
-  private List<CkpMessage> scanCkpMetadata(Path ckpMetaPath) throws IOException {
+  private List<CkpMessage> scanCkpMetadata(Path ckpMetaPath) throws IOException {//拿到最新的ckpmessage
+    LOG.info("current ckpMetaPath is :"+ ckpMetaPath.toString());
     return Arrays.stream(this.fs.listStatus(ckpMetaPath)).map(CkpMessage::new)
         .collect(Collectors.groupingBy(CkpMessage::getInstant)).values().stream()
         .map(messages -> messages.stream().reduce((x, y) -> {
           // Pick the one with the highest state
-          if (x.getState().compareTo(y.getState()) >= 0) {
+          if (x.getState().compareTo(y.getState()) >= 0) {//两者在枚举类里的顺序编号相减结果
             return x;
           }
           return y;
         }).get())
         .sorted().collect(Collectors.toList());
+    //每个instant 有优先级最高的就留最高的 这样搞了一个instant唯一且从小到大的List<CkpMessage>
   }
 }

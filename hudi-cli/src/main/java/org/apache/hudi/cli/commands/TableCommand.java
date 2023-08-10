@@ -78,7 +78,7 @@ public class TableCommand {
           help = "Max checks for eventual consistency") final Integer maxConsistencyChecks)
       throws IOException {
     HoodieCLI
-        .setConsistencyGuardConfig(ConsistencyGuardConfig.newBuilder().withConsistencyCheckEnabled(eventuallyConsistent)
+        .setConsistencyGuardConfig(ConsistencyGuardConfig.newBuilder().withConsistencyCheckEnabled(eventuallyConsistent)//默认false
             .withInitialConsistencyCheckIntervalMs(initialConsistencyIntervalMs)
             .withMaxConsistencyCheckIntervalMs(maxConsistencyIntervalMs).withMaxConsistencyChecks(maxConsistencyChecks)
             .build());

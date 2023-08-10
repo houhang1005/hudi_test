@@ -152,7 +152,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
     this.metrics = Option.empty();
     this.enabledPartitionTypes = new ArrayList<>();
 
-    if (writeConfig.isMetadataTableEnabled()) {
+    if (writeConfig.isMetadataTableEnabled()) {//如果开启metatable配置 那么相关表有一个原名_metadata的新元数据表
       this.tableName = writeConfig.getTableName() + METADATA_TABLE_NAME_SUFFIX;
       this.metadataWriteConfig = createMetadataWriteConfig(writeConfig);
       enabled = true;
@@ -235,6 +235,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
    * Create a {@code HoodieWriteConfig} to use for the Metadata Table.
    *
    * @param writeConfig {@code HoodieWriteConfig} of the main dataset writer
+   * 这个meta表不会无线大 只保存20-30个最新commit
    */
   private HoodieWriteConfig createMetadataWriteConfig(HoodieWriteConfig writeConfig) {
     int parallelism = writeConfig.getMetadataInsertParallelism();
@@ -259,7 +260,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
         .withEmbeddedTimelineServerEnabled(false)
         .withMarkersType(MarkerType.DIRECT.name())
         .withRollbackUsingMarkers(false)
-        .withPath(HoodieTableMetadata.getMetadataTableBasePath(writeConfig.getBasePath()))
+        .withPath(HoodieTableMetadata.getMetadataTableBasePath(writeConfig.getBasePath()))//xxx/.hoodie/metadata
         .withSchema(HoodieMetadataRecord.getClassSchema().toString())
         .forTable(tableName)
         // we will trigger cleaning manually, to control the instant times

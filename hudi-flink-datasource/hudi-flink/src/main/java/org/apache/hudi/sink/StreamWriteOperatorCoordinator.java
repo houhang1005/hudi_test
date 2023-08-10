@@ -122,7 +122,7 @@ public class StreamWriteOperatorCoordinator
    * Event buffer for one round of checkpointing. When all the elements are non-null and have the same
    * write instant, then the instant succeed and we can commit it.
    */
-  private transient WriteMetadataEvent[] eventBuffer;
+  private transient WriteMetadataEvent[] eventBuffer;//
 
   /**
    * Task number of the operator.
@@ -170,7 +170,7 @@ public class StreamWriteOperatorCoordinator
   }
 
   @Override
-  public void start() throws Exception {
+  public void start() throws Exception { //startAllOperatorCoordinators > OperatorCoordinatorHolder.start
     // setup classloader for APIs that use reflection without taking ClassLoader param
     // reference: https://stackoverflow.com/questions/1771679/difference-between-threads-context-class-loader-and-normal-classloader
     Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
@@ -183,7 +183,7 @@ public class StreamWriteOperatorCoordinator
     // the write client must create after the table creation
     this.writeClient = FlinkWriteClients.createWriteClient(conf);
     initMetadataTable(this.writeClient);
-    this.tableState = TableState.create(conf);
+    this.tableState = TableState.create(conf); //
     // start the executor
     this.executor = NonThrownExecutor.builder(LOG)
         .exceptionHook((errMsg, t) -> this.context.failJob(new HoodieException(errMsg, t)))
@@ -231,6 +231,7 @@ public class StreamWriteOperatorCoordinator
     );
   }
 
+  //可能是cp完成后 调用的最初位置 但是这里的执行在 接受event之后
   @Override
   public void notifyCheckpointComplete(long checkpointId) {
     executor.execute(
@@ -241,9 +242,9 @@ public class StreamWriteOperatorCoordinator
           // for streaming mode, commits the ever received events anyway,
           // the stream write task snapshot and flush the data buffer synchronously in sequence,
           // so a successful checkpoint subsumes the old one(follows the checkpoint subsuming contract)
-          final boolean committed = commitInstant(this.instant, checkpointId);
+          final boolean committed = commitInstant(this.instant, checkpointId);//下一步处理WriteMetadataEvent[]  handleWriteMetaEvent提前已经处理并更新了 WriteMetadataEvent[]
 
-          if (tableState.scheduleCompaction) {
+          if (tableState.scheduleCompaction) { //deltacommit写入的cp完成后 根据配置来决定是否生成压缩计划
             // if async compaction is on, schedule the compaction
             CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
           }
@@ -269,12 +270,12 @@ public class StreamWriteOperatorCoordinator
   }
 
   @Override
-  public void handleEventFromOperator(int i, OperatorEvent operatorEvent) {
+  public void handleEventFromOperator(int i, OperatorEvent operatorEvent) {//处理每次cp发送来的event 也就是WriteMetaEvent
     ValidationUtils.checkState(operatorEvent instanceof WriteMetadataEvent,
         "The coordinator can only handle WriteMetaEvent");
     WriteMetadataEvent event = (WriteMetadataEvent) operatorEvent;
 
-    if (event.isEndInput()) {
+    if (event.isEndInput()) {//.endInput(false)
       // handle end input event synchronously
       // wrap handleEndInputEvent in executeSync to preserve the order of events
       executor.executeSync(() -> handleEndInputEvent(event), "handle end input event for instant %s", this.instant);
@@ -284,7 +285,7 @@ public class StreamWriteOperatorCoordinator
             if (event.isBootstrap()) {
               handleBootstrapEvent(event);
             } else {
-              handleWriteMetaEvent(event);
+              handleWriteMetaEvent(event);//这里
             }
           }, "handle write metadata event for instant %s", this.instant
       );
@@ -349,7 +350,7 @@ public class StreamWriteOperatorCoordinator
     return ckpMetadata;
   }
 
-  private void reset() {
+  private void reset() {//到此一游
     this.eventBuffer = new WriteMetadataEvent[this.parallelism];
   }
 
@@ -364,7 +365,7 @@ public class StreamWriteOperatorCoordinator
         .allMatch(event -> event != null && event.isLastBatch());
   }
 
-  private void addEventToBuffer(WriteMetadataEvent event) {
+  private void addEventToBuffer(WriteMetadataEvent event) {//相同的taskid在数组里存在过了就用mergewith
     if (this.eventBuffer[event.getTaskID()] != null) {
       this.eventBuffer[event.getTaskID()].mergeWith(event);
     } else {
@@ -372,12 +373,12 @@ public class StreamWriteOperatorCoordinator
     }
   }
 
-  private void startInstant() {
+  private void startInstant() {//创建出新的instanttime、request文件、
     // put the assignment in front of metadata generation,
     // because the instant request from write task is asynchronous.
     this.instant = this.writeClient.startCommit(tableState.commitAction, this.metaClient);
     this.metaClient.getActiveTimeline().transitionRequestedToInflight(tableState.commitAction, this.instant);
-    this.ckpMetadata.startInstant(this.instant);
+    this.ckpMetadata.startInstant(this.instant);//创建.hoodie下ckp子目录中元数据文件
     LOG.info("Create instant [{}] for table [{}] with type [{}]", this.instant,
         this.conf.getString(FlinkOptions.TABLE_NAME), conf.getString(FlinkOptions.TABLE_TYPE));
   }
@@ -441,7 +442,7 @@ public class StreamWriteOperatorCoordinator
     }
   }
 
-  private void handleWriteMetaEvent(WriteMetadataEvent event) {
+  private void handleWriteMetaEvent(WriteMetadataEvent event) {//可能是接收 sendEventToCoordinator(event)
     // the write task does not block after checkpointing(and before it receives a checkpoint success event),
     // if it checkpoints succeed then flushes the data buffer again before this coordinator receives a checkpoint
     // success event, the data buffer would flush with an older instant time.
@@ -491,18 +492,18 @@ public class StreamWriteOperatorCoordinator
    * @return true if the write statuses are committed successfully.
    */
   private boolean commitInstant(String instant, long checkpointId) {
-    if (Arrays.stream(eventBuffer).allMatch(Objects::isNull)) {
+    if (Arrays.stream(eventBuffer).allMatch(Objects::isNull)) { //所有都是null时 返回true
       // The last checkpoint finished successfully.
       return false;
     }
 
     List<WriteStatus> writeResults = Arrays.stream(eventBuffer)
         .filter(Objects::nonNull)
-        .map(WriteMetadataEvent::getWriteStatuses)
-        .flatMap(Collection::stream)
-        .collect(Collectors.toList());
+        .map(WriteMetadataEvent::getWriteStatuses)//WriteMetadataEvent就是当时flush完成后 包含status的event 即sendEventToCoordinator(event)
+        .flatMap(Collection::stream)//注意这里每一个buffer的event 对应的都是一个list<status>
+        .collect(Collectors.toList());//20230706JUMPA
 
-    if (writeResults.size() == 0) {
+    if (writeResults.size() == 0) { //非空的eventBuffer如果全部拿不到一个writestatus 则直接进入这部分逻辑
       // No data has written, reset the buffer and returns early
       reset();
       // Send commit ack event to the write function to unblock the flushing
@@ -519,13 +520,13 @@ public class StreamWriteOperatorCoordinator
    * Performs the actual commit action.
    */
   @SuppressWarnings("unchecked")
-  private void doCommit(String instant, List<WriteStatus> writeResults) {
+  private void doCommit(String instant, List<WriteStatus> writeResults) { //20230619
     // commit or rollback
     long totalErrorRecords = writeResults.stream().map(WriteStatus::getTotalErrorRecords).reduce(Long::sum).orElse(0L);
     long totalRecords = writeResults.stream().map(WriteStatus::getTotalRecords).reduce(Long::sum).orElse(0L);
     boolean hasErrors = totalErrorRecords > 0;
 
-    if (!hasErrors || this.conf.getBoolean(FlinkOptions.IGNORE_FAILED)) {
+    if (!hasErrors || this.conf.getBoolean(FlinkOptions.IGNORE_FAILED)) {//有错误能容忍 或没错
       HashMap<String, String> checkpointCommitMetadata = new HashMap<>();
       if (hasErrors) {
         LOG.warn("Some records failed to merge but forcing commit since commitOnErrors set to true. Errors/Total="
@@ -534,17 +535,17 @@ public class StreamWriteOperatorCoordinator
 
       final Map<String, List<String>> partitionToReplacedFileIds = tableState.isOverwrite
           ? writeClient.getPartitionToReplacedFileIds(tableState.operationType, writeResults)
-          : Collections.emptyMap();
-      boolean success = writeClient.commit(instant, writeResults, Option.of(checkpointCommitMetadata),
+          : Collections.emptyMap();//空的
+      boolean success = writeClient.commit(instant, writeResults, Option.of(checkpointCommitMetadata), //确认commit是否成功，采用 20230709
           tableState.commitAction, partitionToReplacedFileIds);
       if (success) {
         reset();
-        this.ckpMetadata.commitInstant(instant);
+        this.ckpMetadata.commitInstant(instant); //hdfs创建元数据ckp文件在.hoodie下
         LOG.info("Commit instant [{}] success!", instant);
       } else {
         throw new HoodieException(String.format("Commit instant [%s] failed!", instant));
       }
-    } else {
+    } else {//出现错误时
       LOG.error("Error when writing. Errors/Total=" + totalErrorRecords + "/" + totalRecords);
       LOG.error("The first 100 error messages");
       writeResults.stream().filter(WriteStatus::hasErrors).limit(100).forEach(ws -> {
@@ -626,10 +627,10 @@ public class StreamWriteOperatorCoordinator
     final boolean isDeltaTimeCompaction;
 
     private TableState(Configuration conf) {
-      this.operationType = WriteOperationType.fromValue(conf.getString(FlinkOptions.OPERATION));
-      this.commitAction = CommitUtils.getCommitActionType(this.operationType,
+      this.operationType = WriteOperationType.fromValue(conf.getString(FlinkOptions.OPERATION)); //upsert
+      this.commitAction = CommitUtils.getCommitActionType(this.operationType, //commitaction判断行为 当前mor表就被判断为deltacommit
           HoodieTableType.valueOf(conf.getString(FlinkOptions.TABLE_TYPE).toUpperCase(Locale.ROOT)));
-      this.isOverwrite = WriteOperationType.isOverwrite(this.operationType);
+      this.isOverwrite = WriteOperationType.isOverwrite(this.operationType); //false
       this.scheduleCompaction = OptionsResolver.needsScheduleCompaction(conf);
       this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
       this.syncHive = conf.getBoolean(FlinkOptions.HIVE_SYNC_ENABLED);

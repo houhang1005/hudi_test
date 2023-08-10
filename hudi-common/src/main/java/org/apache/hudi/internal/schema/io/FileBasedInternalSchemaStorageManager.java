@@ -110,12 +110,12 @@ public class FileBasedInternalSchemaStorageManager extends AbstractInternalSchem
     }
   }
 
-  public void cleanOldFiles(List<String> validateCommits) {
+  public void cleanOldFiles(List<String> validateCommits) {//.hoodie/.schema下存放了什么？ 传入的validateCommits是未完成的clean的instant集合
     try {
       FileSystem fs = baseSchemaPath.getFileSystem(conf);
-      if (fs.exists(baseSchemaPath)) {
-        List<String> candidateSchemaFiles = Arrays.stream(fs.listStatus(baseSchemaPath)).filter(f -> f.isFile())
-            .map(file -> file.getPath().getName()).collect(Collectors.toList());
+      if (fs.exists(baseSchemaPath)) {//根据下方contain条件 筛选出文件 然后循环fs.delete
+        List<String> candidateSchemaFiles = Arrays.stream(fs.listStatus(baseSchemaPath)).filter(f -> f.isFile())//candidateSchemaFiles是持久化目录全量文件名
+            .map(file -> file.getPath().getName()).collect(Collectors.toList());//大概是目标listvalidateCommits 包含的原始全量数据 每条数据split后取第一个string后符合listvalidateCommits的
         List<String> validateSchemaFiles = candidateSchemaFiles.stream().filter(f -> validateCommits.contains(f.split("\\.")[0])).collect(Collectors.toList());
         for (int i = 0; i < validateSchemaFiles.size(); i++) {
           fs.delete(new Path(validateSchemaFiles.get(i)));

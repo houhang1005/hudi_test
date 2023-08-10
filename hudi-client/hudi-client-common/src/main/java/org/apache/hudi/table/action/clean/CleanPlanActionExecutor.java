@@ -85,7 +85,7 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
   private boolean needsCleaning(CleaningTriggerStrategy strategy) {
     if (strategy == CleaningTriggerStrategy.NUM_COMMITS) {
       int numberOfCommits = getCommitsSinceLastCleaning();
-      int maxInlineCommitsForNextClean = config.getCleaningMaxCommits();
+      int maxInlineCommitsForNextClean = config.getCleaningMaxCommits();// 1
       return numberOfCommits >= maxInlineCommitsForNextClean;
     } else {
       throw new HoodieException("Unsupported cleaning trigger strategy: " + config.getCleaningTriggerStrategy());
@@ -101,9 +101,9 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
   HoodieCleanerPlan requestClean(HoodieEngineContext context) {
     try {
       CleanPlanner<T, I, K, O> planner = new CleanPlanner<>(context, table, config);
-      Option<HoodieInstant> earliestInstant = planner.getEarliestCommitToRetain();
-      context.setJobStatus(this.getClass().getSimpleName(), "Obtaining list of partitions to be cleaned: " + config.getTableName());
-      List<String> partitionsToClean = planner.getPartitionPathsToClean(earliestInstant);
+      Option<HoodieInstant> earliestInstant = planner.getEarliestCommitToRetain();//根据保存策略（commit数或者时间以及有没有没完成的commit来确认具体清理截止位置）
+      context.setJobStatus(this.getClass().getSimpleName(), "Obtaining list of partitions to be cleaned: " + config.getTableName());//flink侧目前可能啥都没做
+      List<String> partitionsToClean = planner.getPartitionPathsToClean(earliestInstant); //去重后的所有相关分区 这里首先引入了第一次范围
 
       if (partitionsToClean.isEmpty()) {
         LOG.info("Nothing to clean here. It is already clean");
@@ -115,23 +115,26 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
 
       context.setJobStatus(this.getClass().getSimpleName(), "Generating list of file slices to be cleaned: " + config.getTableName());
 
-      Map<String, Pair<Boolean, List<CleanFileInfo>>> cleanOpsWithPartitionMeta = context
-          .map(partitionsToClean, partitionPathToClean -> Pair.of(partitionPathToClean, planner.getDeletePaths(partitionPathToClean)), cleanerParallelism)
+      //重点 除了relpace file groups外基本都已明确
+      Map<String, Pair<Boolean, List<CleanFileInfo>>> cleanOpsWithPartitionMeta = context//进一步会确认数据文件版本 ，map<分区,pair<boolean,list<CleanFileInfo>>> 即map<分区名，Pair<分区是否完全删除，具体待clean文件信息>>
+          .map(partitionsToClean, partitionPathToClean -> Pair.of(partitionPathToClean, planner.getDeletePaths(partitionPathToClean)), cleanerParallelism)//难点 生成压缩前计划最后的疑问
           .stream()
           .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
       Map<String, List<HoodieCleanFileInfo>> cleanOps = cleanOpsWithPartitionMeta.entrySet().stream()
-          .collect(Collectors.toMap(Map.Entry::getKey,
+          .collect(Collectors.toMap(Map.Entry::getKey,//e就是map的一个元素 e.getkey是分区 values 2次后就是CleanFileInfo，在被转为HoodieCleanFileInfo
               e -> CleanerUtils.convertToHoodieCleanFileInfoList(e.getValue().getValue())));
 
-      List<String> partitionsToDelete = cleanOpsWithPartitionMeta.entrySet().stream().filter(entry -> entry.getValue().getKey()).map(Map.Entry::getKey)
+      //根据上方的结果 找出需要删除整个分区的分区 （而不是只clean分区下部分fileslice）
+      List<String> partitionsToDelete = cleanOpsWithPartitionMeta.entrySet().stream().filter(entry -> entry.getValue().getKey()).map(Map.Entry::getKey)//filter只要true的外层map的key也就是分区list
           .collect(Collectors.toList());
 
-      return new HoodieCleanerPlan(earliestInstant
+      //filePathsToBeDeletedPerPartition
+      return new HoodieCleanerPlan(earliestInstant//earliestInstant要不为empty 要不就一个instant 不是多个instant
           .map(x -> new HoodieActionInstant(x.getTimestamp(), x.getAction(), x.getState().name())).orElse(null),
-          planner.getLastCompletedCommitTimestamp(),
+          planner.getLastCompletedCommitTimestamp(),//最后一个完成commit或者deltacommit
           config.getCleanerPolicy().name(), CollectionUtils.createImmutableMap(),
-          CleanPlanner.LATEST_CLEAN_PLAN_VERSION, cleanOps, partitionsToDelete);
+          CleanPlanner.LATEST_CLEAN_PLAN_VERSION, cleanOps, partitionsToDelete);//最后两个是纯粹要清理的文件Map<String, List<HoodieCleanFileInfo>>（filePathsToBeDeletedPerPartition） 和 要清理的分区 List<String>
     } catch (IOException e) {
       throw new HoodieIOException("Failed to schedule clean operation", e);
     }
@@ -145,15 +148,15 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
    * @return Cleaner Plan if generated
    */
   protected Option<HoodieCleanerPlan> requestClean(String startCleanTime) {
-    final HoodieCleanerPlan cleanerPlan = requestClean(context);
+    final HoodieCleanerPlan cleanerPlan = requestClean(context);//生成clean 计划
     if ((cleanerPlan.getFilePathsToBeDeletedPerPartition() != null)
         && !cleanerPlan.getFilePathsToBeDeletedPerPartition().isEmpty()
         && cleanerPlan.getFilePathsToBeDeletedPerPartition().values().stream().mapToInt(List::size).sum() > 0) {
       // Only create cleaner plan which does some work
-      final HoodieInstant cleanInstant = new HoodieInstant(HoodieInstant.State.REQUESTED, HoodieTimeline.CLEAN_ACTION, startCleanTime);
+      final HoodieInstant cleanInstant = new HoodieInstant(HoodieInstant.State.REQUESTED, HoodieTimeline.CLEAN_ACTION, startCleanTime);//生成承载压缩计划的instant文件
       // Save to both aux and timeline folder
       try {
-        table.getActiveTimeline().saveToCleanRequested(cleanInstant, TimelineMetadataUtils.serializeCleanerPlan(cleanerPlan));
+        table.getActiveTimeline().saveToCleanRequested(cleanInstant, TimelineMetadataUtils.serializeCleanerPlan(cleanerPlan));//这一步把压缩计划写入对应clean的元数据文件
         LOG.info("Requesting Cleaning with instant time " + cleanInstant);
       } catch (IOException e) {
         LOG.error("Got exception when saving cleaner requested file", e);
@@ -166,11 +169,11 @@ public class CleanPlanActionExecutor<T extends HoodieRecordPayload, I, K, O> ext
 
   @Override
   public Option<HoodieCleanerPlan> execute() {
-    if (!needsCleaning(config.getCleaningTriggerStrategy())) {
+    if (!needsCleaning(config.getCleaningTriggerStrategy())) {//num_commit
       return Option.empty();
     }
     // Plan a new clean action
-    return requestClean(instantTime);
+    return requestClean(instantTime); //当前带clean commit数大于等于1时
   }
 
 }

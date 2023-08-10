@@ -67,11 +67,11 @@ public class HoodieCommitMetadata implements Serializable {
     this.compacted = compacted;
   }
 
-  public void addWriteStat(String partitionPath, HoodieWriteStat stat) {
+  public void addWriteStat(String partitionPath, HoodieWriteStat stat) {//元数据文件的第一部分 详细关键字就是 partitionToWriteStats
     if (!partitionToWriteStats.containsKey(partitionPath)) {
       partitionToWriteStats.put(partitionPath, new ArrayList<>());
     }
-    partitionToWriteStats.get(partitionPath).add(stat);
+    partitionToWriteStats.get(partitionPath).add(stat);//在commit提交过程中会更新这个map
   }
 
   public void addMetadata(String metaKey, String value) {
@@ -86,7 +86,7 @@ public class HoodieCommitMetadata implements Serializable {
     return extraMetadata;
   }
 
-  public Map<String, List<HoodieWriteStat>> getPartitionToWriteStats() {
+  public Map<String, List<HoodieWriteStat>> getPartitionToWriteStats() {//0717怎么来的
     return partitionToWriteStats;
   }
 

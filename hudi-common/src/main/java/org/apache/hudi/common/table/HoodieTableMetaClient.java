@@ -613,6 +613,7 @@ public class HoodieTableMetaClient implements Serializable {
    * action instant, only include the highest state
    * @return List of Hoodie Instants generated
    * @throws IOException in case of failure
+   * .hoodie目录下扫描所有该扫的文件最后更新List<HoodieInstant>
    */
   public List<HoodieInstant> scanHoodieInstantsFromFileSystem(Path timelinePath, Set<String> includedExtensions,
       boolean applyLayoutVersionFilters) throws IOException {

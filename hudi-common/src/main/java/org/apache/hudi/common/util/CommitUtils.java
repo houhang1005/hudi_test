@@ -81,16 +81,16 @@ public class CommitUtils {
                                                    WriteOperationType operationType,
                                                    String schemaToStoreInCommit,
                                                    String commitActionType) {
-
+    //commitMetadata 包含了Map<String, List<HoodieWriteStat>> partitionToWriteStats
     HoodieCommitMetadata commitMetadata = buildMetadataFromStats(writeStats, partitionToReplaceFileIds, commitActionType, operationType);
 
     // add in extra metadata
-    if (extraMetadata.isPresent()) {
+    if (extraMetadata.isPresent()) {//上游给的就是空的 这里不走
       extraMetadata.get().forEach(commitMetadata::addMetadata);
     }
     commitMetadata.addMetadata(HoodieCommitMetadata.SCHEMA_KEY, (schemaToStoreInCommit == null || schemaToStoreInCommit.equals(NULL_SCHEMA_STR))
-        ? "" : schemaToStoreInCommit);
-    commitMetadata.setOperationType(operationType);
+        ? "" : schemaToStoreInCommit);//schemaToStoreInCommit是否就是.commit那个文件的大json
+    commitMetadata.setOperationType(operationType);//UPSERT
     return commitMetadata;
   }
 
@@ -107,9 +107,9 @@ public class CommitUtils {
       commitMetadata = new HoodieCommitMetadata();
     }
 
-    for (HoodieWriteStat writeStat : writeStats) {
+    for (HoodieWriteStat writeStat : writeStats) {//这里的writestats 对应一个bucket的数据
       String partition = writeStat.getPartitionPath();
-      commitMetadata.addWriteStat(partition, writeStat);
+      commitMetadata.addWriteStat(partition, writeStat);//所以commitMetadata对象包含了一个变量：partitionToWriteStats Map<String, List<HoodieWriteStat>> 即每个分区对应一个list list是具体每个消息
     }
 
     LOG.info("Creating  metadata for " + operationType + " numWriteStats:" + writeStats.size()

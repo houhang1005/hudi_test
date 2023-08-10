@@ -84,10 +84,11 @@ public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
     super.open(parameters);
     this.bucketNum = config.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
     this.indexKeyFields = config.getString(FlinkOptions.INDEX_KEY_FIELD);
-    this.taskID = getRuntimeContext().getIndexOfThisSubtask();
-    this.parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
+    this.taskID = getRuntimeContext().getIndexOfThisSubtask();//获取当前这个subtask的编号
+    this.parallelism = getRuntimeContext().getNumberOfParallelSubtasks(); //
     this.bucketIndex = new HashMap<>();
     this.incBucketIndex = new HashSet<>();
+    LOG.info("OPEN_COMPLETE,当前并行度为"+parallelism+"taskID为"+taskID);
   }
 
   @Override
@@ -108,14 +109,16 @@ public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
     final String partition = hoodieKey.getPartitionPath();
     final HoodieRecordLocation location;
 
-    bootstrapIndexIfNeed(partition);
+    bootstrapIndexIfNeed(partition);//构建了HashMap<partition,HashMap<bucketnumber,fileID>>
     Map<Integer, String> bucketToFileId = bucketIndex.computeIfAbsent(partition, p -> new HashMap<>());
-    final int bucketNum = BucketIdentifier.getBucketId(hoodieKey, indexKeyFields, this.bucketNum);
+    final int bucketNum = BucketIdentifier.getBucketId(hoodieKey, indexKeyFields, this.bucketNum);//计算本条消息真正应该写入哪个bucketNum
+//    LOG.info("CURRENT_BUCKETnum is "+bucketNum);
     final String bucketId = partition + "/" + bucketNum;
 
+    //incBucketIndex每次cp都会从头开始 但是每个分区对应的bucketToFileId不会重置 所以同一个bucket里 bucket type都一样
     if (incBucketIndex.contains(bucketId)) {
       location = new HoodieRecordLocation("I", bucketToFileId.get(bucketNum));
-    } else if (bucketToFileId.containsKey(bucketNum)) {
+    } else if (bucketToFileId.containsKey(bucketNum)) {//第二个cp时 incBucketIndex被清空所以走这里
       location = new HoodieRecordLocation("U", bucketToFileId.get(bucketNum));
     } else {
       String newFileId = BucketIdentifier.newBucketFileIdPrefix(bucketNum);
@@ -126,7 +129,7 @@ public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
     record.unseal();
     record.setCurrentLocation(location);
     record.seal();
-    bufferRecord(record);
+    bufferRecord(record);//把HoodieRecord 刷入buffer
   }
 
   /**
@@ -154,11 +157,11 @@ public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
     Map<Integer, String> bucketToFileIDMap = new HashMap<>();
     this.writeClient.getHoodieTable().getHoodieView().getLatestFileSlices(partition).forEach(fileSlice -> {
       String fileId = fileSlice.getFileId();
-      int bucketNumber = BucketIdentifier.bucketIdFromFileId(fileId);
-      if (isBucketToLoad(bucketNumber, partition)) {
+      int bucketNumber = BucketIdentifier.bucketIdFromFileId(fileId);//fileId前八位的数字为bucketNumber
+      if (isBucketToLoad(bucketNumber, partition)) {//如果当前bucketNumber属于对应本task的taskid
         LOG.info(String.format("Should load this partition bucket %s with fileId %s", bucketNumber, fileId));
         // Validate that one bucketId has only ONE fileId
-        if (bucketToFileIDMap.containsKey(bucketNumber)) {
+        if (bucketToFileIDMap.containsKey(bucketNumber)) {//当前同一个分区下 一个bucketNumber只会对应一个fileID
           throw new RuntimeException(String.format("Duplicate fileId %s from bucket %s of partition %s found "
               + "during the BucketStreamWriteFunction index bootstrap.", fileId, bucketNumber, partition));
         } else {

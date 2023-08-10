@@ -58,7 +58,7 @@ public class HoodieDefaultTimeline implements HoodieTimeline {
     setInstants(instants.collect(Collectors.toList()));
   }
 
-  public void setInstants(List<HoodieInstant> instants) {
+  public void setInstants(List<HoodieInstant> instants) {//
     this.instants = instants;
     final MessageDigest md;
     try {
@@ -156,9 +156,9 @@ public class HoodieDefaultTimeline implements HoodieTimeline {
 
   @Override
   public HoodieDefaultTimeline findInstantsAfter(String instantTime, int numCommits) {
-    return new HoodieDefaultTimeline(instants.stream()
+    return new HoodieDefaultTimeline( instants.stream()
         .filter(s -> compareTimestamps(s.getTimestamp(), GREATER_THAN, instantTime)).limit(numCommits),
-        details);
+        details);//.filterInstantsByAction("")
   }
 
   @Override

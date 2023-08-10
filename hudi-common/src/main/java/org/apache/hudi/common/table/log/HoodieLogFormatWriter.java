@@ -136,7 +136,7 @@ public class HoodieLogFormatWriter implements HoodieLogFormat.Writer {
   }
 
   @Override
-  public AppendResult appendBlocks(List<HoodieLogBlock> blocks) throws IOException, InterruptedException {
+  public AppendResult appendBlocks(List<HoodieLogBlock> blocks) throws IOException, InterruptedException {//写入.hoodie/archived目录 文件名为“.commits_.archive.1_1-0-1”
     // Find current version
     HoodieLogFormat.LogFormatVersion currentLogFormatVersion =
         new HoodieLogFormatVersion(HoodieLogFormat.CURRENT_VERSION);
@@ -149,7 +149,7 @@ public class HoodieLogFormatWriter implements HoodieLogFormat.Writer {
     for (HoodieLogBlock block: blocks) {
       long startSize = outputStream.size();
 
-      // 1. Write the magic header for the start of the block
+      // 1. Write the magic header for the start of the block 这个目录下的文件确实开头就是#HUDI#
       outputStream.write(HoodieLogFormat.MAGIC);
 
       // bytes for header

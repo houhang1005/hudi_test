@@ -38,7 +38,7 @@ public class BucketIdentifier implements Serializable {
     return getBucketId(record.getKey(), indexKeyFields, numBuckets);
   }
 
-  public static int getBucketId(HoodieKey hoodieKey, String indexKeyFields, int numBuckets) {
+  public static int getBucketId(HoodieKey hoodieKey, String indexKeyFields, int numBuckets) { //ru
     return (getHashKeys(hoodieKey, indexKeyFields).hashCode() & Integer.MAX_VALUE) % numBuckets;
   }
 

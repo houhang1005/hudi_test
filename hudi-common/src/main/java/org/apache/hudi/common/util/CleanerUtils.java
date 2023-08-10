@@ -111,7 +111,7 @@ public class CleanerUtils {
   public static HoodieCleanerPlan getCleanerPlan(HoodieTableMetaClient metaClient, HoodieInstant cleanInstant)
       throws IOException {
     CleanPlanMigrator cleanPlanMigrator = new CleanPlanMigrator(metaClient);
-    HoodieCleanerPlan cleanerPlan = TimelineMetadataUtils.deserializeAvroMetadata(
+    HoodieCleanerPlan cleanerPlan = TimelineMetadataUtils.deserializeAvroMetadata(//HoodieCleanerPlan???为何能以这种方法获得前面的clean计划（因为具体给了instant）
         metaClient.getActiveTimeline().readCleanerInfoAsBytes(cleanInstant).get(), HoodieCleanerPlan.class);
     return cleanPlanMigrator.upgradeToLatest(cleanerPlan, cleanerPlan.getVersion());
   }
@@ -135,7 +135,7 @@ public class CleanerUtils {
                                           Functions.Function0<Boolean> rollbackFailedWritesFunc) {
     switch (actionType) {
       case HoodieTimeline.CLEAN_ACTION:
-        if (cleaningPolicy.isEager()) {
+        if (cleaningPolicy.isEager()) {//默认是eager
           // No need to do any special cleanup for failed operations during clean
           return;
         } else if (cleaningPolicy.isLazy()) {

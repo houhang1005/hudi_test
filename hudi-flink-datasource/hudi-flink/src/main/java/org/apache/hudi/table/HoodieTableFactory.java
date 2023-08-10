@@ -84,8 +84,9 @@ public class HoodieTableFactory implements DynamicTableSourceFactory, DynamicTab
 
   @Override
   public DynamicTableSink createDynamicTableSink(Context context) {
+    System.out.println("createDynamicTableSink__");
     Configuration conf = FlinkOptions.fromMap(context.getCatalogTable().getOptions());
-    checkArgument(!StringUtils.isNullOrEmpty(conf.getString(FlinkOptions.PATH)),
+    checkArgument(!StringUtils.isNullOrEmpty(conf.getString(FlinkOptions.PATH)),//建hudi的sql语句如果没有指定path直接报错
         "Option [path] should not be empty.");
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     sanityCheck(conf, schema);

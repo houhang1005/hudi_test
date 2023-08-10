@@ -374,18 +374,18 @@ public class StreamWriteFunction<I> extends AbstractStreamWriteFunction<I> {
    * @param value HoodieRecord
    */
   protected void bufferRecord(HoodieRecord<?> value) {
-    final String bucketID = getBucketID(value);
+    final String bucketID = getBucketID(value);//带分区路径
 
     DataBucket bucket = this.buckets.computeIfAbsent(bucketID,
         k -> new DataBucket(this.config.getDouble(FlinkOptions.WRITE_BATCH_SIZE), value));
-    final DataItem item = DataItem.fromHoodieRecord(value);
+    final DataItem item = DataItem.fromHoodieRecord(value);//瘦身封装为 DataItem
 
     bucket.records.add(item);
 
     boolean flushBucket = bucket.detector.detect(item);
     boolean flushBuffer = this.tracer.trace(bucket.detector.lastRecordSize);
     if (flushBucket) {
-      if (flushBucket(bucket)) {
+      if (flushBucket(bucket)) {//写
         this.tracer.countDown(bucket.detector.totalSize);
         bucket.reset();
       }
@@ -418,13 +418,13 @@ public class StreamWriteFunction<I> extends AbstractStreamWriteFunction<I> {
       return false;
     }
 
-    List<HoodieRecord> records = bucket.writeBuffer();
+    List<HoodieRecord> records = bucket.writeBuffer(); //把dataBucket中的 List<DataItem>改为 List<HoodieRecord>
     ValidationUtils.checkState(records.size() > 0, "Data bucket to flush has no buffering records");
-    if (config.getBoolean(FlinkOptions.PRE_COMBINE)) {
+    if (config.getBoolean(FlinkOptions.PRE_COMBINE)) {//precombine
       records = FlinkWriteHelper.newInstance().deduplicateRecords(records, (HoodieIndex) null, -1);
     }
-    bucket.preWrite(records);
-    final List<WriteStatus> writeStatus = new ArrayList<>(writeFunction.apply(records, instant));
+    bucket.preWrite(records);//写一条 然后定好位置
+    final List<WriteStatus> writeStatus = new ArrayList<>(writeFunction.apply(records, instant)); //根据insert还是upsert才真正执行写入
     records.clear();
     final WriteMetadataEvent event = WriteMetadataEvent.builder()
         .taskID(taskID)
@@ -434,13 +434,14 @@ public class StreamWriteFunction<I> extends AbstractStreamWriteFunction<I> {
         .endInput(false)
         .build();
 
-    this.eventGateway.sendEventToCoordinator(event);
-    writeStatuses.addAll(writeStatus);
+    this.eventGateway.sendEventToCoordinator(event); //把结果发送给后续notifyCheckpointComplete 也就是cp完成后要用这个结果更新meta
+    writeStatuses.addAll(writeStatus);//list 添加另一个list
     return true;
   }
 
   @SuppressWarnings("unchecked, rawtypes")
   private void flushRemaining(boolean endInput) {
+    LOG.info("具体snapshotState的实现");
     this.currentInstant = instantToWrite(hasData());
     if (this.currentInstant == null) {
       // in case there are empty checkpoints that has no input data
@@ -458,7 +459,7 @@ public class StreamWriteFunction<I> extends AbstractStreamWriteFunction<I> {
               if (config.getBoolean(FlinkOptions.PRE_COMBINE)) {
                 records = FlinkWriteHelper.newInstance().deduplicateRecords(records, (HoodieIndex) null, -1);
               }
-              bucket.preWrite(records);
+              bucket.preWrite(records);//？？真正写入？--第0条写入和写入location buckets什么时候写入的？
               writeStatus.addAll(writeFunction.apply(records, currentInstant));
               records.clear();
               bucket.reset();

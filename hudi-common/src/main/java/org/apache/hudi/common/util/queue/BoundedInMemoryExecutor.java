@@ -149,7 +149,7 @@ public class BoundedInMemoryExecutor<I, O, E> {
    */
   public E execute() {
     try {
-      startProducers();
+      startProducers();//record放入queue
       Future<E> future = startConsumer();
       // Wait for consumer to be done
       return future.get();

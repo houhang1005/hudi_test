@@ -41,7 +41,7 @@ import java.io.IOException;
 import static org.apache.hudi.util.StreamerUtil.flinkConf2TypedProperties;
 
 /**
- * Function that transforms RowData to HoodieRecord.
+ * Function that transforms RowData to HoodieRecord. 实现rowdata转hoodie的方法
  */
 public class RowDataToHoodieFunction<I extends RowData, O extends HoodieRecord>
     extends RichMapFunction<I, O> {
@@ -83,15 +83,16 @@ public class RowDataToHoodieFunction<I extends RowData, O extends HoodieRecord>
   @Override
   public void open(Configuration parameters) throws Exception {
     super.open(parameters);
-    this.avroSchema = StreamerUtil.getSourceSchema(this.config);
-    this.converter = RowDataToAvroConverters.createConverter(this.rowType);
-    this.keyGenerator =
+    this.avroSchema = StreamerUtil.getSourceSchema(this.config); //暂时无法确认如何获取，flink侧通常也不配置该路径
+    this.converter = RowDataToAvroConverters.createConverter(this.rowType); // rowType就是flink的logicalType
+    this.keyGenerator = //默认是不设置用的simple
         HoodieAvroKeyGeneratorFactory
             .createKeyGenerator(flinkConf2TypedProperties(this.config));
     this.payloadCreation = PayloadCreation.instance(config);
   }
 
   @SuppressWarnings("unchecked")
+  //每条消息都要经过这里map转
   @Override
   public O map(I i) throws Exception {
     return (O) toHoodieRecord(i);

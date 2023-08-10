@@ -47,7 +47,7 @@ import org.apache.hudi.common.util.Option;
 public class MetadataConversionUtils {
 
   public static HoodieArchivedMetaEntry createMetaWrapper(HoodieInstant hoodieInstant, HoodieTableMetaClient metaClient) throws IOException {
-    HoodieArchivedMetaEntry archivedMetaWrapper = new HoodieArchivedMetaEntry();
+    HoodieArchivedMetaEntry archivedMetaWrapper = new HoodieArchivedMetaEntry();//archivedMetaWrapper包含了timestame 状态 类型 avro元数据
     archivedMetaWrapper.setCommitTime(hoodieInstant.getTimestamp());
     archivedMetaWrapper.setActionState(hoodieInstant.getState().name());
     switch (hoodieInstant.getAction()) {
@@ -68,9 +68,9 @@ public class MetadataConversionUtils {
         break;
       }
       case HoodieTimeline.DELTA_COMMIT_ACTION: {
-        HoodieCommitMetadata deltaCommitMetadata = HoodieCommitMetadata
+        HoodieCommitMetadata deltaCommitMetadata = HoodieCommitMetadata//把byte类型的元数据 封装为HoodieCommitMetadata 写入deltaCommitMetadata变量
                 .fromBytes(metaClient.getActiveTimeline().getInstantDetails(hoodieInstant).get(), HoodieCommitMetadata.class);
-        archivedMetaWrapper.setHoodieCommitMetadata(convertCommitMetadata(deltaCommitMetadata));
+        archivedMetaWrapper.setHoodieCommitMetadata(convertCommitMetadata(deltaCommitMetadata));//avro类型的的元数据写入hoodieCommitMetadata变量
         archivedMetaWrapper.setActionType(ActionType.deltacommit.name());
         break;
       }
@@ -204,7 +204,7 @@ public class MetadataConversionUtils {
     ObjectMapper mapper = new ObjectMapper();
     // Need this to ignore other public get() methods
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    org.apache.hudi.avro.model.HoodieCommitMetadata avroMetaData =
+    org.apache.hudi.avro.model.HoodieCommitMetadata avroMetaData =//byte[]转成avro类型的metadata
             mapper.convertValue(hoodieCommitMetadata, org.apache.hudi.avro.model.HoodieCommitMetadata.class);
     if (hoodieCommitMetadata.getCompacted()) {
       avroMetaData.setOperationType(WriteOperationType.COMPACT.name());

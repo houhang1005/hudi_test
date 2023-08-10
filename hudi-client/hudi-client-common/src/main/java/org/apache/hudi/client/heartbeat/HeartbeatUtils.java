@@ -70,7 +70,7 @@ public class HeartbeatUtils {
    */
   public static boolean deleteHeartbeatFile(FileSystem fs, String basePath, String instantTime, HoodieWriteConfig config) {
     if (config.getFailedWritesCleanPolicy().isLazy()) {
-      return deleteHeartbeatFile(fs, basePath, instantTime);
+      return deleteHeartbeatFile(fs, basePath, instantTime);//清理具体心跳文件
     }
 
     return false;

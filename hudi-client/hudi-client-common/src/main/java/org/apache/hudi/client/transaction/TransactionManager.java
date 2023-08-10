@@ -47,10 +47,10 @@ public class TransactionManager implements Serializable {
 
   public void beginTransaction(Option<HoodieInstant> newTxnOwnerInstant,
                                Option<HoodieInstant> lastCompletedTxnOwnerInstant) {
-    if (isOptimisticConcurrencyControlEnabled) {
+    if (isOptimisticConcurrencyControlEnabled) {//默认是single writer
       LOG.info("Transaction starting for " + newTxnOwnerInstant
           + " with latest completed transaction instant " + lastCompletedTxnOwnerInstant);
-      lockManager.lock();
+      lockManager.lock();//获得锁
       reset(currentTxnOwnerInstant, newTxnOwnerInstant, lastCompletedTxnOwnerInstant);
       LOG.info("Transaction started for " + newTxnOwnerInstant
           + " with latest completed transaction instant " + lastCompletedTxnOwnerInstant);

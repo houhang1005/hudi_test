@@ -40,9 +40,9 @@ public class BucketIndexPartitioner<T extends HoodieKey> implements Partitioner<
   }
 
   @Override
-  public int partition(HoodieKey key, int numPartitions) {
+  public int partition(HoodieKey key, int numPartitions) { //numPartitions一般来说就是channel数
     int curBucket = BucketIdentifier.getBucketId(key, indexKeyFields, bucketNum);
-    int partitionIndex = (key.getPartitionPath().hashCode() & Integer.MAX_VALUE) % numPartitions;
+    int partitionIndex = (key.getPartitionPath().hashCode() & Integer.MAX_VALUE) % numPartitions; //算出唯一分区号
     int globalIndex = partitionIndex + curBucket;
     return BucketIdentifier.mod(globalIndex, numPartitions);
   }

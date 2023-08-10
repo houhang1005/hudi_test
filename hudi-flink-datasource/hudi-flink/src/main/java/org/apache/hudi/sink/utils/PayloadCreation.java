@@ -76,7 +76,7 @@ public class PayloadCreation implements Serializable {
   public HoodieRecordPayload<?> createPayload(GenericRecord record) throws Exception {
     if (shouldCombine) {
       ValidationUtils.checkState(preCombineField != null);
-      Comparable<?> orderingVal = (Comparable<?>) HoodieAvroUtils.getNestedFieldVal(record,
+      Comparable<?> orderingVal = (Comparable<?>) HoodieAvroUtils.getNestedFieldVal(record,//暂不清楚 orderingval
           preCombineField, false, false);
       return (HoodieRecordPayload<?>) constructor.newInstance(record, orderingVal);
     } else {

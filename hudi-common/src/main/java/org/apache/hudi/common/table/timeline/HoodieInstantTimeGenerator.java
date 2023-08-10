@@ -75,7 +75,7 @@ public class HoodieInstantTimeGenerator {
           Date d = new Date(System.currentTimeMillis() + milliseconds);
           newCommitTime = MILLIS_INSTANT_TIME_FORMATTER.format(convertDateToTemporalAccessor(d));
         }
-      } while (HoodieTimeline.compareTimestamps(newCommitTime, HoodieActiveTimeline.LESSER_THAN_OR_EQUALS, oldVal));
+      } while (HoodieTimeline.compareTimestamps(newCommitTime, HoodieActiveTimeline.LESSER_THAN_OR_EQUALS, oldVal));//当前的newCommitTime小于等于oldVal则返回
       return newCommitTime;
     });
   }
@@ -84,10 +84,10 @@ public class HoodieInstantTimeGenerator {
     try {
       // Enables backwards compatibility with non-millisecond granularity instants
       String timestampInMillis = timestamp;
-      if (isSecondGranularity(timestamp)) {
+      if (isSecondGranularity(timestamp)) {//只到秒时
         // Add milliseconds to the instant in order to parse successfully
         timestampInMillis = timestamp + DEFAULT_MILLIS_EXT;
-      } else if (timestamp.length() > MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH) {
+      } else if (timestamp.length() > MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH) {//比带了毫秒时还长 就截取
         // compaction and cleaning in metadata has special format. handling it by trimming extra chars and treating it with ms granularity
         timestampInMillis = timestamp.substring(0, MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH);
       }

@@ -253,7 +253,7 @@ public abstract class AbstractStreamWriteFunction<I>
    * Returns the last pending instant time.
    */
   protected String lastPendingInstant() {
-    return this.ckpMetadata.lastPendingInstant();
+    return this.ckpMetadata.lastPendingInstant();//如果刚好都做完了 可能返回的是null
   }
 
   /**
@@ -262,8 +262,8 @@ public abstract class AbstractStreamWriteFunction<I>
    * @param hasData Whether the task has buffering data
    * @return The instant time
    */
-  protected String instantToWrite(boolean hasData) {
-    String instant = lastPendingInstant();
+  protected String instantToWrite(boolean hasData) { //准备一个下一次要用的时间点（未来）
+    String instant = lastPendingInstant();//从ckpmessage里获取最新的 不是完成状态的instant
     // if exactly-once semantics turns on,
     // waits for the checkpoint notification until the checkpoint timeout threshold hits.
     TimeWait timeWait = TimeWait.builder()

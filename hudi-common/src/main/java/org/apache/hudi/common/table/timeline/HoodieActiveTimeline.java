@@ -154,12 +154,12 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
     this(metaClient, includedExtensions, true);
   }
 
-  protected HoodieActiveTimeline(HoodieTableMetaClient metaClient, Set<String> includedExtensions,
+  protected HoodieActiveTimeline(HoodieTableMetaClient metaClient, Set<String> includedExtensions,//新instant文件生成后 通过下方方法扫描元数据目录拿到完整instant的list
       boolean applyLayoutFilters) {
     // Filter all the filter in the metapath and include only the extensions passed and
     // convert them into HoodieInstant
     try {
-      this.setInstants(metaClient.scanHoodieInstantsFromFileSystem(includedExtensions, applyLayoutFilters));
+      this.setInstants(metaClient.scanHoodieInstantsFromFileSystem(includedExtensions, applyLayoutFilters));//内部方法scanHoodieInstantsFromFileSystem已经刷新了instant的list 外部算hash
     } catch (IOException e) {
       throw new HoodieIOException("Failed to scan metadata", e);
     }
@@ -197,7 +197,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
     in.defaultReadObject();
   }
 
-  public void createNewInstant(HoodieInstant instant) {
+  public void createNewInstant(HoodieInstant instant) {//1
     LOG.info("Creating a new instant " + instant);
     // Create the in-flight file
     createFileInMetaPath(instant.getFileName(), Option.empty(), false);
@@ -217,9 +217,9 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
 
   public void saveAsComplete(HoodieInstant instant, Option<byte[]> data) {
     LOG.info("Marking instant complete " + instant);
-    ValidationUtils.checkArgument(instant.isInflight(),
+    ValidationUtils.checkArgument(instant.isInflight(),//往active timeline加时 只能加inflight的 complete的加过了
         "Could not mark an already completed instant as complete again " + instant);
-    transitionState(instant, HoodieTimeline.getCompletedInstant(instant), data);
+    transitionState(instant, HoodieTimeline.getCompletedInstant(instant), data);//把inflight转为complete
     LOG.info("Completed " + instant);
   }
 
@@ -256,7 +256,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
 
   public void deleteEmptyInstantIfExists(HoodieInstant instant) {
     ValidationUtils.checkArgument(isEmpty(instant));
-    deleteInstantFileIfExists(instant);
+    deleteInstantFileIfExists(instant);//删除clean元数据文件 而不是根据元数据文件（clean计划）而删除具体对象
   }
 
   public void deleteCompactionRequested(HoodieInstant instant) {
@@ -302,7 +302,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
   @Override
   public Option<byte[]> getInstantDetails(HoodieInstant instant) {
     Path detailPath = getInstantFileNamePath(instant.getFileName());
-    return readDataFromPath(detailPath);
+    return readDataFromPath(detailPath);//从20230714114022123.clean.request读
   }
 
   /**
@@ -559,15 +559,15 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
   }
 
   protected void transitionState(HoodieInstant fromInstant, HoodieInstant toInstant, Option<byte[]> data,
-       boolean allowRedundantTransitions) {
+       boolean allowRedundantTransitions) { //当前false
     ValidationUtils.checkArgument(fromInstant.getTimestamp().equals(toInstant.getTimestamp()));
     try {
-      if (metaClient.getTimelineLayoutVersion().isNullVersion()) {
+      if (metaClient.getTimelineLayoutVersion().isNullVersion()) {//需要根据老的instant创建一次新的元数据文件 但是layout版本应该一直是1
         // Re-create the .inflight file by opening a new file and write the commit metadata in
         createFileInMetaPath(fromInstant.getFileName(), data, allowRedundantTransitions);
         Path fromInstantPath = getInstantFileNamePath(fromInstant.getFileName());
         Path toInstantPath = getInstantFileNamePath(toInstant.getFileName());
-        boolean success = metaClient.getFs().rename(fromInstantPath, toInstantPath);
+        boolean success = metaClient.getFs().rename(fromInstantPath, toInstantPath);//直接更换名字
         if (!success) {
           throw new HoodieIOException("Could not rename " + fromInstantPath + " to " + toInstantPath);
         }
@@ -579,7 +579,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
         if (allowRedundantTransitions) {
           FileIOUtils.createFileInPath(metaClient.getFs(), getInstantFileNamePath(toInstant.getFileName()), data);
         } else {
-          metaClient.getFs().createImmutableFileInPath(getInstantFileNamePath(toInstant.getFileName()), data);
+          metaClient.getFs().createImmutableFileInPath(getInstantFileNamePath(toInstant.getFileName()), data);//创建inflight文件然后把content写入.hoodie下
         }
         LOG.info("Create new file for toInstant ?" + getInstantFileNamePath(toInstant.getFileName()));
       }
@@ -587,7 +587,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
       throw new HoodieIOException("Could not complete " + fromInstant, e);
     }
   }
-
+  //completed 转为 inflight 删除老目录创建新的
   protected void revertCompleteToInflight(HoodieInstant completed, HoodieInstant inflight) {
     ValidationUtils.checkArgument(completed.getTimestamp().equals(inflight.getTimestamp()));
     Path inFlightCommitFilePath = getInstantFileNamePath(inflight.getFileName());
@@ -623,7 +623,7 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
   }
 
   private Path getInstantFileNamePath(String fileName) {
-    return new Path(fileName.contains(SCHEMA_COMMIT_ACTION) ? metaClient.getSchemaFolderName() : metaClient.getMetaPath(), fileName);
+    return new Path(fileName.contains(SCHEMA_COMMIT_ACTION) ? metaClient.getSchemaFolderName() : metaClient.getMetaPath(), fileName);//指.hoodie
   }
 
   public void transitionRequestedToInflight(String commitType, String inFlightInstant) {
@@ -636,10 +636,10 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
   }
 
   public void transitionRequestedToInflight(HoodieInstant requested, Option<byte[]> content,
-      boolean allowRedundantTransitions) {
+      boolean allowRedundantTransitions) {//false
     HoodieInstant inflight = new HoodieInstant(State.INFLIGHT, requested.getAction(), requested.getTimestamp());
-    ValidationUtils.checkArgument(requested.isRequested(), "Instant " + requested + " in wrong state");
-    transitionState(requested, inflight, content, allowRedundantTransitions);
+    ValidationUtils.checkArgument(requested.isRequested(), "Instant " + requested + " in wrong state");//已经转inflight了 如果还是request则抛出异常
+    transitionState(requested, inflight, content, allowRedundantTransitions); //状态转换 这里是requested转inflight 实际则需要在.hoodie目录下创建个新的inflight文件 不需要删除request
   }
 
   public void saveToCompactionRequested(HoodieInstant instant, Option<byte[]> content) {
@@ -741,12 +741,12 @@ public class HoodieActiveTimeline extends HoodieDefaultTimeline {
     createFileInMetaPath(instant.getFileName(), content, false);
   }
 
-  protected void createFileInMetaPath(String filename, Option<byte[]> content, boolean allowOverwrite) {
+  protected void createFileInMetaPath(String filename, Option<byte[]> content, boolean allowOverwrite) {//1
     Path fullPath = getInstantFileNamePath(filename);
     if (allowOverwrite || metaClient.getTimelineLayoutVersion().isNullVersion()) {
       FileIOUtils.createFileInPath(metaClient.getFs(), fullPath, content);
     } else {
-      metaClient.getFs().createImmutableFileInPath(fullPath, content);
+      metaClient.getFs().createImmutableFileInPath(fullPath, content);//写入clean计划到元数据文件
     }
   }
 

@@ -209,6 +209,7 @@ public class Pipelines {
       Configuration conf,
       RowType rowType,
       DataStream<RowData> dataStream) {
+    System.out.println("bootstrap and is bucketindex 111");
     return bootstrap(conf, rowType, dataStream, false, false);
   }
 
@@ -222,6 +223,7 @@ public class Pipelines {
    * @param dataStream The data stream
    * @param bounded    Whether the source is bounded
    * @param overwrite  Whether it is insert overwrite
+   * 转为了
    */
   public static DataStream<HoodieRecord> bootstrap(
       Configuration conf,
@@ -231,6 +233,7 @@ public class Pipelines {
       boolean overwrite) {
     final boolean globalIndex = conf.getBoolean(FlinkOptions.INDEX_GLOBAL_ENABLED);
     if (overwrite || OptionsResolver.isBucketIndexType(conf)) {
+      System.out.println("bootstrap and is bucketindex");
       return rowDataToHoodieRecord(conf, rowType, dataStream);
     } else if (bounded && !globalIndex && OptionsResolver.isPartitionedTable(conf)) {
       return boundedBootstrap(conf, rowType, dataStream);
@@ -314,10 +317,12 @@ public class Pipelines {
    */
   public static DataStream<Object> hoodieStreamWrite(Configuration conf, DataStream<HoodieRecord> dataStream) {
     if (OptionsResolver.isBucketIndexType(conf)) {
-      WriteOperatorFactory<HoodieRecord> operatorFactory = BucketStreamWriteOperator.getFactory(conf);
+      System.out.println("hoodieStreamWrite_开始分区");
+      WriteOperatorFactory<HoodieRecord> operatorFactory = BucketStreamWriteOperator.getFactory(conf);//确认每个record应该分到哪个bucket里
       int bucketNum = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
       String indexKeyFields = conf.getString(FlinkOptions.INDEX_KEY_FIELD);
-      BucketIndexPartitioner<HoodieKey> partitioner = new BucketIndexPartitioner<>(bucketNum, indexKeyFields);
+      BucketIndexPartitioner<HoodieKey> partitioner = new BucketIndexPartitioner<>(bucketNum, indexKeyFields); //shuffle过程里自定义了数据如何交给后续算子
+      System.out.println("datastream.partitionCustom.transform");
       return dataStream.partitionCustom(partitioner, HoodieRecord::getKey)
           .transform(opName("bucket_write", conf), TypeInformation.of(Object.class), operatorFactory)
           .uid(opUID("bucket_write", conf))

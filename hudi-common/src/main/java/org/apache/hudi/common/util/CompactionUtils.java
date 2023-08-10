@@ -211,11 +211,12 @@ public class CompactionUtils {
    *
    * @param activeTimeline Active timeline of a table.
    * @return Pair of timeline containing delta commits and an instant.
+   * 获得最后一次完成的压缩或者replace的Pair<HoodieTimeline, HoodieInstant>
    */
   public static Option<Pair<HoodieTimeline, HoodieInstant>> getDeltaCommitsSinceLatestCompaction(
       HoodieActiveTimeline activeTimeline) {
     Option<HoodieInstant> lastCompaction = activeTimeline.getCommitTimeline()
-        .filterCompletedInstants().lastInstant();
+        .filterCompletedInstants().lastInstant();//最后一个完成压缩或clustering的instant
     HoodieTimeline deltaCommits = activeTimeline.getDeltaCommitTimeline();
 
     HoodieInstant latestInstant;
@@ -223,10 +224,11 @@ public class CompactionUtils {
       latestInstant = lastCompaction.get();
       // timeline containing the delta commits after the latest completed compaction commit,
       // and the completed compaction commit instant
+      //这里返回的是全为delta commits 的
       return Option.of(Pair.of(deltaCommits.findInstantsAfter(
           latestInstant.getTimestamp(), Integer.MAX_VALUE), lastCompaction.get()));
     } else {
-      if (deltaCommits.countInstants() > 0) {
+      if (deltaCommits.countInstants() > 0) {//已完成的deltacommit数大于0时
         latestInstant = deltaCommits.firstInstant().get();
         // timeline containing all the delta commits, and the first delta commit instant
         return Option.of(Pair.of(deltaCommits.findInstantsAfterOrEquals(
@@ -282,19 +284,19 @@ public class CompactionUtils {
   public static Option<HoodieInstant> getOldestInstantToRetainForCompaction(
       HoodieActiveTimeline activeTimeline, int maxDeltaCommits) {
     Option<Pair<HoodieTimeline, HoodieInstant>> deltaCommitsInfoOption =
-        CompactionUtils.getDeltaCommitsSinceLatestCompaction(activeTimeline);
+        CompactionUtils.getDeltaCommitsSinceLatestCompaction(activeTimeline);//<压缩完成后的timeline,最后一次压缩instant>
     if (deltaCommitsInfoOption.isPresent()) {
       Pair<HoodieTimeline, HoodieInstant> deltaCommitsInfo = deltaCommitsInfoOption.get();
       HoodieTimeline deltaCommitTimeline = deltaCommitsInfo.getLeft();
-      int numDeltaCommits = deltaCommitTimeline.countInstants();
-      if (numDeltaCommits < maxDeltaCommits) {
+      int numDeltaCommits = deltaCommitTimeline.countInstants();//最后一次压缩完成后有多少个deltacommit <这里也许应该指定为状态完成的>
+      if (numDeltaCommits < maxDeltaCommits) {//此时返回最后一个完成的压缩instant当标杆 比标杆小的都可以archive
         return Option.of(deltaCommitsInfo.getRight());
-      } else {
+      } else {//猜测这里已经有压缩计划但是这最新的压缩计划肯定没完成
         // delta commits with the last one to keep
         List<HoodieInstant> instants = deltaCommitTimeline.getInstants()
             .limit(numDeltaCommits - maxDeltaCommits + 1).collect(Collectors.toList());
-        return Option.of(instants.get(instants.size() - 1));
-      }
+        return Option.of(instants.get(instants.size() - 1));//拿最后一个元素 例如20个commit -5 +1 =16 然后最后一个要涉及compaction的元素选后 还剩下刚好4个不触发maxDeltaCommits
+      }//压缩计划生成后 deltacommit对压缩来说没有用了 但是查询
     }
     return Option.empty();
   }
