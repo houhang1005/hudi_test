@@ -92,12 +92,12 @@ public class BucketStreamWriteFunction<I> extends StreamWriteFunction<I> {
   }
 
   @Override
-  public void initializeState(FunctionInitializationContext context) throws Exception {
+  public void initializeState(FunctionInitializationContext context) throws Exception {//任务初始化时从状态里获取信息
     super.initializeState(context);
   }
 
   @Override
-  public void snapshotState() {
+  public void snapshotState() { //每次cp都会把数据写入状态
     super.snapshotState();
     this.incBucketIndex.clear();
   }

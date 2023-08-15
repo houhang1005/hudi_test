@@ -234,7 +234,7 @@ public class Pipelines {
     final boolean globalIndex = conf.getBoolean(FlinkOptions.INDEX_GLOBAL_ENABLED);
     if (overwrite || OptionsResolver.isBucketIndexType(conf)) {
       System.out.println("bootstrap and is bucketindex");
-      return rowDataToHoodieRecord(conf, rowType, dataStream);
+      return rowDataToHoodieRecord(conf, rowType, dataStream);//bucketIndex
     } else if (bounded && !globalIndex && OptionsResolver.isPartitionedTable(conf)) {
       return boundedBootstrap(conf, rowType, dataStream);
     } else {

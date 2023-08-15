@@ -433,7 +433,7 @@ public class StreamWriteFunction<I> extends AbstractStreamWriteFunction<I> {
         .lastBatch(false)
         .endInput(false)
         .build();
-
+    //截止目前没有发现啥地方更新了meta表
     this.eventGateway.sendEventToCoordinator(event); //把结果发送给后续notifyCheckpointComplete 也就是cp完成后要用这个结果更新meta
     writeStatuses.addAll(writeStatus);//list 添加另一个list
     return true;

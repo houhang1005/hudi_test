@@ -182,7 +182,7 @@ public class StreamWriteOperatorCoordinator
     this.ckpMetadata = initCkpMetadata(this.metaClient);
     // the write client must create after the table creation
     this.writeClient = FlinkWriteClients.createWriteClient(conf);
-    initMetadataTable(this.writeClient);
+    initMetadataTable(this.writeClient);//后续要判断是否开了metadataTable
     this.tableState = TableState.create(conf); //
     // start the executor
     this.executor = NonThrownExecutor.builder(LOG)
@@ -192,6 +192,7 @@ public class StreamWriteOperatorCoordinator
     if (tableState.syncHive) {
       initHiveSync();
     }
+    LOG.info("start completed");
   }
 
   @Override
@@ -243,7 +244,7 @@ public class StreamWriteOperatorCoordinator
           // the stream write task snapshot and flush the data buffer synchronously in sequence,
           // so a successful checkpoint subsumes the old one(follows the checkpoint subsuming contract)
           final boolean committed = commitInstant(this.instant, checkpointId);//下一步处理WriteMetadataEvent[]  handleWriteMetaEvent提前已经处理并更新了 WriteMetadataEvent[]
-
+          LOG.info("CUR notifyCheckpointComplete INSTANT IS "+ this.instant);
           if (tableState.scheduleCompaction) { //deltacommit写入的cp完成后 根据配置来决定是否生成压缩计划
             // if async compaction is on, schedule the compaction
             CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
@@ -442,7 +443,7 @@ public class StreamWriteOperatorCoordinator
     }
   }
 
-  private void handleWriteMetaEvent(WriteMetadataEvent event) {//可能是接收 sendEventToCoordinator(event)
+  private void handleWriteMetaEvent(WriteMetadataEvent event) {//可能是接收 sendEventToCoordinator(event) 并写入eventbuffer
     // the write task does not block after checkpointing(and before it receives a checkpoint success event),
     // if it checkpoints succeed then flushes the data buffer again before this coordinator receives a checkpoint
     // success event, the data buffer would flush with an older instant time.

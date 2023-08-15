@@ -129,7 +129,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
   protected boolean enabled;
   protected SerializableConfiguration hadoopConf;
   protected final transient HoodieEngineContext engineContext;
-  protected final List<MetadataPartitionType> enabledPartitionTypes;
+  protected final List<MetadataPartitionType> enabledPartitionTypes; //待确认何时赋值（外层 w ->() 没有就新建writer 前提是开了metatable 但是这里为new ArrayList<>()） 影响到后续metadata转1种record还是3种
 
   /**
    * Hudi backed table metadata writer.
@@ -816,8 +816,9 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
     // if indexing is inflight then do not trigger table service
     boolean doNotTriggerTableService = partitionsToUpdate.stream().anyMatch(inflightIndexes::contains);
 
-    if (enabled && metadata != null) {
+    if (enabled && metadata != null) { //左true
       // convert metadata and filter only the entries whose partition path are in partitionsToUpdate
+      //注意convertMetadataFunction 是已经在上一步包含了metadata数据并加工逻辑的 这里是把其加工后的逻辑用这里的partitionsToUpdate过滤了一遍而已
       Map<MetadataPartitionType, HoodieData<HoodieRecord>> partitionRecordsMap = convertMetadataFunction.convertMetadata().entrySet().stream()
           .filter(entry -> partitionsToUpdate.contains(entry.getKey().getPartitionPath())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       commit(instantTime, partitionRecordsMap, !doNotTriggerTableService && canTriggerTableService);
@@ -887,7 +888,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
    */
   @Override
   public void update(HoodieCommitMetadata commitMetadata, String instantTime, boolean isTableServiceAction) {
-    processAndCommit(instantTime, () -> HoodieTableMetadataUtil.convertMetadataToRecords(
+    processAndCommit(instantTime, () -> HoodieTableMetadataUtil.convertMetadataToRecords(//先convertMetadataToRecords 再processAndCommit
         engineContext, commitMetadata, instantTime, getRecordsGenerationParams()), !isTableServiceAction);
     closeInternal();
   }

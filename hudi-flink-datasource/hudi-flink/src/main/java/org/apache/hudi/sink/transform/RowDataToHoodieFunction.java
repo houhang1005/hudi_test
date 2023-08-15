@@ -41,7 +41,7 @@ import java.io.IOException;
 import static org.apache.hudi.util.StreamerUtil.flinkConf2TypedProperties;
 
 /**
- * Function that transforms RowData to HoodieRecord. 实现rowdata转hoodie的方法
+ * Function that transforms RowData to HoodieRecord. 实现rowdata转hoodieRecord的方法
  */
 public class RowDataToHoodieFunction<I extends RowData, O extends HoodieRecord>
     extends RichMapFunction<I, O> {

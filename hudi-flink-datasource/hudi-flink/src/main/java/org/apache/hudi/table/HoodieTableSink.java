@@ -79,7 +79,7 @@ public class HoodieTableSink implements DynamicTableSink, SupportsPartitioning, 
         return Pipelines.bulkInsert(conf, rowType, dataStream);
       }
 
-      // Append mode
+      // Append mode mor不走这里
       if (OptionsResolver.isAppendMode(conf)) {
         System.out.println("is append mode");
         DataStream<Object> pipeline = Pipelines.append(conf, rowType, dataStream, context.isBounded());

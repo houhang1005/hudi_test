@@ -152,7 +152,7 @@ public class HoodieFlinkWriteClient<T extends HoodieRecordPayload> extends
   public List<WriteStatus> upsert(List<HoodieRecord<T>> records, String instantTime) {//upsert具体操作
     HoodieTable<T, List<HoodieRecord<T>>, List<HoodieKey>, List<WriteStatus>> table =
         initTable(WriteOperationType.UPSERT, Option.ofNullable(instantTime));
-    table.validateUpsertSchema();
+    table.validateUpsertSchema();//新老schema对比 如果兼容有问题则抛出异常+捕获异常
     preWrite(instantTime, WriteOperationType.UPSERT, table.getMetaClient());
     HoodieWriteMetadata<List<WriteStatus>> result;
     try (AutoCloseableWriteHandle closeableHandle = new AutoCloseableWriteHandle(records, instantTime, table)) {
@@ -299,7 +299,7 @@ public class HoodieFlinkWriteClient<T extends HoodieRecordPayload> extends
   /**
    * Initialized the metadata table on start up, should only be called once on driver.
    */
-  public void initMetadataTable() { //检查是否开了metadata
+  public void initMetadataTable() { //检查是否开了metadata 20230811
     HoodieFlinkTable<?> table = getHoodieTable();
     if (config.isMetadataTableEnabled()) {
       // initialize the metadata table path

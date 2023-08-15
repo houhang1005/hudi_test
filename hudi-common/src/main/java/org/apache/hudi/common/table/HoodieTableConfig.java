@@ -625,7 +625,7 @@ public class HoodieTableConfig extends HoodieConfig {
   public List<String> getMetadataPartitionsInflight() {
     return StringUtils.split(
         getStringOrDefault(TABLE_METADATA_PARTITIONS_INFLIGHT, StringUtils.EMPTY_STRING),
-        CONFIG_VALUES_DELIMITER
+        CONFIG_VALUES_DELIMITER//逗号分隔
     );
   }
 
