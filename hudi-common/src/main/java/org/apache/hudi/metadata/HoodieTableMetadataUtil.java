@@ -284,7 +284,7 @@ public class HoodieTableMetadataUtil {
     final Map<MetadataPartitionType, HoodieData<HoodieRecord>> partitionToRecordsMap = new HashMap<>();
     final HoodieData<HoodieRecord> filesPartitionRecordsRDD = context.parallelize(
         convertMetadataToFilesPartitionRecords(commitMetadata, instantTime), 1); //metadata 转为 FilesPartitionRecords
-    partitionToRecordsMap.put(MetadataPartitionType.FILES, filesPartitionRecordsRDD);//key是个三种枚举类
+    partitionToRecordsMap.put(MetadataPartitionType.FILES, filesPartitionRecordsRDD);//key是个三种枚举类之一 先强行把FILES的写入map
 
     //recordsGenerationParams对象里允许剩下两种的话 则也会再转为各自类型的records放入map里。根据metadataWriter实例参数 这里getEnabledPartitionTypes是个新的list
     if (recordsGenerationParams.getEnabledPartitionTypes().contains(MetadataPartitionType.BLOOM_FILTERS)) {

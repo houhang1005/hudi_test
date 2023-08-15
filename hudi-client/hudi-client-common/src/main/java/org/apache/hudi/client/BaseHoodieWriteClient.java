@@ -234,7 +234,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
         lastCompletedTxnAndMetadata.isPresent() ? Option.of(lastCompletedTxnAndMetadata.get().getLeft()) : Option.empty());
     try {
       preCommit(inflightInstant, metadata);//conflict resolution 不确认为何只有spark的
-      commit(table, commitActionType, instantTime, metadata, stats);
+      commit(table, commitActionType, instantTime, metadata, stats);//这里包含一部分metadataTable的东西
       postCommit(table, metadata, instantTime, extraMetadata); //用writemarker删除marker文件+instant踢出心跳
       LOG.info("Committed " + instantTime);
       releaseResources();
@@ -351,6 +351,8 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
    * @param actionType action type of the commit.
    * @param metadata instance of {@link HoodieCommitMetadata}.
    *                 修改每一个元数据writer的状态 flink来说前提是开了metatable
+   *                 20230815 更新./hoodie目录下每个deltacommit的源文件前，就要先更新元数据表
+   *                 具体就是先获取一个 HoodieTableMetadataWriter 然后调用update逻辑
    */
   protected void writeTableMetadata(HoodieTable table, String instantTime, String actionType, HoodieCommitMetadata metadata) {
     context.setJobStatus(this.getClass().getSimpleName(), "Committing to metadata table: " + config.getTableName());

@@ -821,7 +821,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
       //注意convertMetadataFunction 是已经在上一步包含了metadata数据并加工逻辑的 这里是把其加工后的逻辑用这里的partitionsToUpdate过滤了一遍而已
       Map<MetadataPartitionType, HoodieData<HoodieRecord>> partitionRecordsMap = convertMetadataFunction.convertMetadata().entrySet().stream()
           .filter(entry -> partitionsToUpdate.contains(entry.getKey().getPartitionPath())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      commit(instantTime, partitionRecordsMap, !doNotTriggerTableService && canTriggerTableService);
+      commit(instantTime, partitionRecordsMap, !doNotTriggerTableService && canTriggerTableService);//这里是true
     }
   }
 
@@ -887,7 +887,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
    * @param isTableServiceAction {@code true} if commit metadata is pertaining to a table service. {@code false} otherwise.
    */
   @Override
-  public void update(HoodieCommitMetadata commitMetadata, String instantTime, boolean isTableServiceAction) {
+  public void update(HoodieCommitMetadata commitMetadata, String instantTime, boolean isTableServiceAction) {//上层isTableServiceAction为false
     processAndCommit(instantTime, () -> HoodieTableMetadataUtil.convertMetadataToRecords(//先convertMetadataToRecords 再processAndCommit
         engineContext, commitMetadata, instantTime, getRecordsGenerationParams()), !isTableServiceAction);
     closeInternal();
