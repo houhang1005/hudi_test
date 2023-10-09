@@ -153,11 +153,11 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
     this.enabledPartitionTypes = new ArrayList<>();
 
     if (writeConfig.isMetadataTableEnabled()) {//如果开启metatable配置 那么相关表有一个原名_metadata的新元数据表
-      this.tableName = writeConfig.getTableName() + METADATA_TABLE_NAME_SUFFIX;
-      this.metadataWriteConfig = createMetadataWriteConfig(writeConfig);
+      this.tableName = writeConfig.getTableName() + METADATA_TABLE_NAME_SUFFIX; //hudi表后面带个后缀（_metadata）就是元数据表名
+      this.metadataWriteConfig = createMetadataWriteConfig(writeConfig);//从原表和metadatatable自己的配置里获取这次要构建metadata table的参数
       enabled = true;
 
-      // Inline compaction and auto clean is required as we dont expose this table outside
+      // Inline compaction and auto clean is required as we dont expose this table outside 下方参数有的是防止无线套娃 这些明面上参数需要都为false，即不开：自动clean 在线压缩 元数据表
       ValidationUtils.checkArgument(!this.metadataWriteConfig.isAutoClean(),
           "Cleaning is controlled internally for Metadata table.");
       ValidationUtils.checkArgument(!this.metadataWriteConfig.inlineCompactionEnabled(),
@@ -170,9 +170,9 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
 
       this.dataMetaClient =
           HoodieTableMetaClient.builder().setConf(hadoopConf).setBasePath(dataWriteConfig.getBasePath()).build();
-      enablePartitions();
-      initRegistry();
-      initialize(engineContext, actionMetadata, inflightInstantTimestamp);
+      enablePartitions();//hoodie.base.path
+      initRegistry();//开启metric再说
+      initialize(engineContext, actionMetadata, inflightInstantTimestamp);//很长 暂不明确
       initTableMetadata();
     } else {
       enabled = false;
@@ -186,6 +186,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
 
   /**
    * Enable metadata table partitions based on config.
+   * 大约就是
    */
   private void enablePartitions() {
     final HoodieMetadataConfig metadataConfig = dataWriteConfig.getMetadataConfig();
@@ -203,6 +204,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
 
     Option<HoodieTableFileSystemView> fsView = Option.ofNullable(
         metaClient.isPresent() ? HoodieTableMetadataUtil.getFileSystemView(metaClient.get()) : null);
+    //默认走这里 ，用的是MetadataPartitionType.FILES 且file group count 为1 MetadataPartitionType这个list里就一个
     enablePartition(MetadataPartitionType.FILES, metadataConfig, metaClient, fsView, isBootstrapCompleted);
     if (metadataConfig.isBloomFilterIndexEnabled()) {
       enablePartition(MetadataPartitionType.BLOOM_FILTERS, metadataConfig, metaClient, fsView, isBootstrapCompleted);
@@ -225,7 +227,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
                                final Option<HoodieTableMetaClient> metaClient, Option<HoodieTableFileSystemView> fsView, boolean isBootstrapCompleted) {
     final int fileGroupCount = HoodieTableMetadataUtil.getPartitionFileGroupCount(partitionType, metaClient, fsView,
         metadataConfig, isBootstrapCompleted);
-    partitionType.setFileGroupCount(fileGroupCount);
+    partitionType.setFileGroupCount(fileGroupCount);//不走布隆和列状态 那就是1
     this.enabledPartitionTypes.add(partitionType);
   }
 
@@ -295,7 +297,7 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
 
     // RecordKey properties are needed for the metadata table records
     final Properties properties = new Properties();
-    properties.put(HoodieTableConfig.RECORDKEY_FIELDS.key(), RECORD_KEY_FIELD_NAME);
+    properties.put(HoodieTableConfig.RECORDKEY_FIELDS.key(), RECORD_KEY_FIELD_NAME);//hoodie.table.recordkey.fields
     properties.put("hoodie.datasource.write.recordkey.field", RECORD_KEY_FIELD_NAME);
     builder.withProperties(properties);
 
@@ -979,11 +981,11 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
 
     HoodieTableFileSystemView fsView = HoodieTableMetadataUtil.getFileSystemView(metadataMetaClient);
     for (Map.Entry<MetadataPartitionType, HoodieData<HoodieRecord>> entry : partitionRecordsMap.entrySet()) {
-      final String partitionName = entry.getKey().getPartitionPath();
+      final String partitionName = entry.getKey().getPartitionPath();//map的key是三种枚举类型之一分区类型 然后拿到其分区路径
       final int fileGroupCount = entry.getKey().getFileGroupCount();
       HoodieData<HoodieRecord> records = entry.getValue();
 
-      List<FileSlice> fileSlices =
+      List<FileSlice> fileSlices =//指定分区下 所有fliegroup 每个fg里最新的flieslice
           HoodieTableMetadataUtil.getPartitionLatestFileSlices(metadataMetaClient, Option.ofNullable(fsView), partitionName);
       if (fileSlices.isEmpty()) {
         // scheduling of INDEX only initializes the file group and not add commit
@@ -995,13 +997,13 @@ public abstract class HoodieBackedTableMetadataWriter implements HoodieTableMeta
               partitionName, fileSlices.size(), fileGroupCount));
 
       List<FileSlice> finalFileSlices = fileSlices;
-      HoodieData<HoodieRecord> rddSinglePartitionRecords = records.map(r -> {
-        FileSlice slice = finalFileSlices.get(HoodieTableMetadataUtil.mapRecordKeyToFileGroupIndex(r.getRecordKey(),
+      HoodieData<HoodieRecord> rddSinglePartitionRecords = records.map(r -> {//rddSinglePartitionRecords是挨个被更新过location的 hoodieRecord
+        FileSlice slice = finalFileSlices.get(HoodieTableMetadataUtil.mapRecordKeyToFileGroupIndex(r.getRecordKey(),//决定key对应哪个编号（filegroup总数）
             fileGroupCount));
         r.setCurrentLocation(new HoodieRecordLocation(slice.getBaseInstantTime(), slice.getFileId()));
         return r;
       });
-
+      //这里可能是因为不止默认MetadataPartitionType.file这一个 所以有多种都union到一个set里
       allPartitionRecords = allPartitionRecords.union(rddSinglePartitionRecords);
     }
     return allPartitionRecords;

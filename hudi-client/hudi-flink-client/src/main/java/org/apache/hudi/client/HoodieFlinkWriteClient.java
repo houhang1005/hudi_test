@@ -116,7 +116,7 @@ public class HoodieFlinkWriteClient<T extends HoodieRecordPayload> extends
     return FlinkHoodieIndexFactory.createIndex((HoodieFlinkEngineContext) context, config);
   }
 
-  //由每次cp完成时调用
+  //由每次cp完成时调用；；本次调用来自metadata表更新
   @Override
   public boolean commit(String instantTime, List<WriteStatus> writeStatuses, Option<Map<String, String>> extraMetadata, String commitActionType, Map<String, List<String>> partitionToReplacedFileIds) {
     List<HoodieWriteStat> writeStats = writeStatuses.parallelStream().map(WriteStatus::getStat).collect(Collectors.toList());//List<WriteStatus> 变为 List<HoodieWriteStat>

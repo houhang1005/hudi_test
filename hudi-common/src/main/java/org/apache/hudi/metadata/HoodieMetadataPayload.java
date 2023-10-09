@@ -307,6 +307,7 @@ public class HoodieMetadataPayload implements HoodieRecordPayload<HoodieMetadata
     partitionsDeleted.forEach(partition -> fileInfo.put(partition, new HoodieMetadataFileInfo(0L, true)));
 
     HoodieKey key = new HoodieKey(RECORDKEY_PARTITION_LIST, MetadataPartitionType.FILES.getPartitionPath());
+    //HoodieMetadataPayload
     HoodieMetadataPayload payload = new HoodieMetadataPayload(key.getRecordKey(), METADATA_TYPE_PARTITION_LIST,
         fileInfo);
     return new HoodieAvroRecord<>(key, payload);

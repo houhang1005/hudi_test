@@ -76,6 +76,7 @@ public class HoodieWriteMetadata<O> {
     return newMetadataInstance;
   }
 
+  //这里就是flink写入hudi表 处理每个bucket里的record都会有这个
   public O getWriteStatuses() {
     return writeStatuses;
   }

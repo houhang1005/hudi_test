@@ -894,7 +894,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     this.clientSpecifiedViewStorageConfig = null;
   }
 
-  protected HoodieWriteConfig(EngineType engineType, Properties props) {
+  protected HoodieWriteConfig(EngineType engineType, Properties props) {//metadataConfig
     super(props);
     Properties newProps = new Properties();
     newProps.putAll(props);
@@ -1762,7 +1762,7 @@ public class HoodieWriteConfig extends HoodieConfig {
    * metrics properties.
    */
   public boolean isMetricsOn() {
-    return getBoolean(HoodieMetricsConfig.TURN_METRICS_ON);
+    return getBoolean(HoodieMetricsConfig.TURN_METRICS_ON);//hoodie.metrics
   }
 
   public boolean isExecutorMetricsEnabled() {

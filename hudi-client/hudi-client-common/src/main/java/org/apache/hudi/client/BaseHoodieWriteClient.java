@@ -226,7 +226,7 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     LOG.info("Committing " + instantTime + " action " + commitActionType);
     // Create a Hoodie table which encapsulated the commits and files visible
     HoodieTable table = createTable(config, hadoopConf);//hoodieflinktable
-    HoodieCommitMetadata metadata = CommitUtils.buildMetadata(stats, partitionToReplaceFileIds,//有extra就也加入到
+    HoodieCommitMetadata metadata = CommitUtils.buildMetadata(stats, partitionToReplaceFileIds,//[决定后面用的metadataTable的元数据]有extra就也加入到
         extraMetadata, operationType, config.getWriteSchema(), commitActionType);
     HoodieInstant inflightInstant = new HoodieInstant(State.INFLIGHT, table.getMetaClient().getCommitActionType(), instantTime);
     HeartbeatUtils.abortIfHeartbeatExpired(instantTime, table, heartbeatClient, config);//heartbt如果过期了抛出exception
@@ -271,6 +271,10 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
     return true;
   }
 
+  //table 就是hoodieflinktable 用指定配置创建的hudi表
+  //commitActionType 为“deltacommit”
+  //instantTime 新建时间
+  //metadata 为List<state>经过一系列转换的到的 最早来自写数据到hudi表是 buffer 和flush那边的sendEvent
   protected void commit(HoodieTable table, String commitActionType, String instantTime, HoodieCommitMetadata metadata,
                       List<HoodieWriteStat> stats) throws IOException {
     LOG.info("Committing " + instantTime + " action " + commitActionType);
@@ -355,9 +359,10 @@ public abstract class BaseHoodieWriteClient<T extends HoodieRecordPayload, I, K,
    *                 具体就是先获取一个 HoodieTableMetadataWriter 然后调用update逻辑
    */
   protected void writeTableMetadata(HoodieTable table, String instantTime, String actionType, HoodieCommitMetadata metadata) {
+    //flink下写hudi时 这个setjobStatus实际什么也没做;暂时不管metadataWriter
     context.setJobStatus(this.getClass().getSimpleName(), "Committing to metadata table: " + config.getTableName());
     table.getMetadataWriter(instantTime).ifPresent(w -> ((HoodieTableMetadataWriter) w).update(metadata, instantTime,
-        table.isTableServiceAction(actionType, instantTime)));//mor 则为false
+        table.isTableServiceAction(actionType, instantTime)));//mor 则为false，tableserver则都为true
   }
 
   /**

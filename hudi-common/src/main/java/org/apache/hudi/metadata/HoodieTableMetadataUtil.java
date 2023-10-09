@@ -283,7 +283,7 @@ public class HoodieTableMetadataUtil {
       MetadataRecordsGenerationParams recordsGenerationParams) {
     final Map<MetadataPartitionType, HoodieData<HoodieRecord>> partitionToRecordsMap = new HashMap<>();
     final HoodieData<HoodieRecord> filesPartitionRecordsRDD = context.parallelize(
-        convertMetadataToFilesPartitionRecords(commitMetadata, instantTime), 1); //metadata 转为 FilesPartitionRecords
+        convertMetadataToFilesPartitionRecords(commitMetadata, instantTime), 1); //metadata 转为 FilesPartitionRecords 20230915需要重点关注其写入内容
     partitionToRecordsMap.put(MetadataPartitionType.FILES, filesPartitionRecordsRDD);//key是个三种枚举类之一 先强行把FILES的写入map
 
     //recordsGenerationParams对象里允许剩下两种的话 则也会再转为各自类型的records放入map里。根据metadataWriter实例参数 这里getEnabledPartitionTypes是个新的list
@@ -316,11 +316,12 @@ public class HoodieTableMetadataUtil {
     // Add record bearing deleted partitions list
     List<String> partitionsDeleted = getPartitionsDeleted(commitMetadata);
 
+    //records里增加HoodieAvroRecord<>(key, payload)  key是__all_partitions__ ;payload是一个由黑白名单（待delete的map）等对象构成的
     records.add(HoodieMetadataPayload.createPartitionListRecord(partitionsAdded, partitionsDeleted));
 
     // Update files listing records for each individual partition
     List<HoodieRecord<HoodieMetadataPayload>> updatedPartitionFilesRecords =
-        commitMetadata.getPartitionToWriteStats().entrySet()
+        commitMetadata.getPartitionToWriteStats().entrySet()//Map<String, List<HoodieWriteStat>>
             .stream()
             .map(entry -> {
               String partitionStatName = entry.getKey();
@@ -329,8 +330,8 @@ public class HoodieTableMetadataUtil {
               String partition = getPartitionIdentifier(partitionStatName);
 
               HashMap<String, Long> updatedFilesToSizesMapping =
-                  writeStats.stream().reduce(new HashMap<>(writeStats.size()),
-                      (map, stat) -> {
+                  writeStats.stream().reduce(new HashMap<>(writeStats.size()), //reduce 里三个参数 最后返回类型、每个元素的处理方法、最后合并结果方法
+                      (map, stat) -> {//map是返回结果 stat是每个构成LIST元素 也就是HoodieWriteStat
                         String pathWithPartition = stat.getPath();
                         if (pathWithPartition == null) {
                           // Empty partition
@@ -338,17 +339,17 @@ public class HoodieTableMetadataUtil {
                           return map;
                         }
 
-                        String fileName = FSUtils.getFileName(pathWithPartition, partitionStatName);
+                        String fileName = FSUtils.getFileName(pathWithPartition, partitionStatName);//只要一个没有路径前缀的文件名
 
                         // Since write-stats are coming in no particular order, if the same
                         // file have previously been appended to w/in the txn, we simply pick max
                         // of the sizes as reported after every write, since file-sizes are
                         // monotonically increasing (ie file-size never goes down, unless deleted)
-                        map.merge(fileName, stat.getFileSizeInBytes(), Math::max);
+                        map.merge(fileName, stat.getFileSizeInBytes(), Math::max);//相同的文件名时 谁的文件大就存谁，即第三个参数是merge的逻辑
 
-                        return map;
+                        return map;//map是迭代使用的 本轮的结果还要给下一轮继续结合新的HoodieWriteStat继续生成新map
                       },
-                      CollectionUtils::combine);
+                      CollectionUtils::combine);//实际用不上 除非是parallelStream时需要把多个并行结果最后在合并一次
 
               return HoodieMetadataPayload.createPartitionFilesRecord(partition, Option.of(updatedFilesToSizesMapping),
                   Option.empty());
@@ -1070,7 +1071,7 @@ public class HoodieTableMetadataUtil {
         return Collections.EMPTY_LIST;
       }
     } else {
-      fileSliceStream = fsView.getLatestFileSlices(partition);
+      fileSliceStream = fsView.getLatestFileSlices(partition);//
     }
     return fileSliceStream.sorted(Comparator.comparing(FileSlice::getFileId)).collect(Collectors.toList());
   }

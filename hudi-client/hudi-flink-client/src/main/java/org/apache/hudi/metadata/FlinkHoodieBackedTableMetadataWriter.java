@@ -104,14 +104,14 @@ public class FlinkHoodieBackedTableMetadataWriter extends HoodieBackedTableMetad
 
   @Override
   protected void commit(String instantTime, Map<MetadataPartitionType, HoodieData<HoodieRecord>> partitionRecordsMap,
-                        boolean canTriggerTableService) {
+                        boolean canTriggerTableService) {//
     ValidationUtils.checkState(enabled, "Metadata table cannot be committed to as it is not enabled");
     ValidationUtils.checkState(metadataMetaClient != null, "Metadata table is not fully initialized yet.");
     HoodieData<HoodieRecord> preppedRecords = prepRecords(partitionRecordsMap);
     List<HoodieRecord> preppedRecordList = preppedRecords.collectAsList();
 
     try (HoodieFlinkWriteClient writeClient = new HoodieFlinkWriteClient(engineContext, metadataWriteConfig)) {
-      if (canTriggerTableService) {
+      if (canTriggerTableService) {//true 下方是压缩metadata table这个特殊的mor表
         // trigger compaction before doing the delta commit. this is to ensure, if this delta commit succeeds in metadata table, but failed in data table,
         // we would have compacted metadata table and so could have included uncommitted data which will never be ignored while reading from metadata
         // table (since reader will filter out only from delta commits)
@@ -119,9 +119,9 @@ public class FlinkHoodieBackedTableMetadataWriter extends HoodieBackedTableMetad
       }
 
       if (!metadataMetaClient.getActiveTimeline().containsInstant(instantTime)) {
-        // if this is a new commit being applied to metadata for the first time
-        writeClient.startCommitWithTime(instantTime);
-        metadataMetaClient.getActiveTimeline().transitionRequestedToInflight(HoodieActiveTimeline.DELTA_COMMIT_ACTION, instantTime);
+        // if this is a new commit being applied to metadata for the first time 如果这个instant首次出现
+        writeClient.startCommitWithTime(instantTime); //创建新的 instant在active timeline中 和正常表和表服务那种instant一样
+        metadataMetaClient.getActiveTimeline().transitionRequestedToInflight(HoodieActiveTimeline.DELTA_COMMIT_ACTION, instantTime); //这里指定instant从request转为inflight
       } else {
         Option<HoodieInstant> alreadyCompletedInstant = metadataMetaClient.getActiveTimeline().filterCompletedInstants().filter(entry -> entry.getTimestamp().equals(instantTime)).lastInstant();
         if (alreadyCompletedInstant.isPresent()) {
@@ -148,7 +148,7 @@ public class FlinkHoodieBackedTableMetadataWriter extends HoodieBackedTableMetad
       }
 
       List<WriteStatus> statuses = preppedRecordList.size() > 0
-          ? writeClient.upsertPreppedRecords(preppedRecordList, instantTime)
+          ? writeClient.upsertPreppedRecords(preppedRecordList, instantTime) //转换暂不深入
           : Collections.emptyList();
       statuses.forEach(writeStatus -> {
         if (writeStatus.hasErrors()) {
@@ -156,11 +156,12 @@ public class FlinkHoodieBackedTableMetadataWriter extends HoodieBackedTableMetad
         }
       });
       // flink does not support auto-commit yet, also the auto commit logic is not complete as BaseHoodieWriteClient now.
+      //这里掉的commit 实际和其他正常完成cp后 commit动作的instant是一个方法
       writeClient.commit(instantTime, statuses, Option.empty(), HoodieActiveTimeline.DELTA_COMMIT_ACTION, Collections.emptyMap());
 
       // reload timeline
       metadataMetaClient.reloadActiveTimeline();
-      if (canTriggerTableService) {
+      if (canTriggerTableService) {//上方有判断
         cleanIfNecessary(writeClient, instantTime);
         writeClient.archive();
       }

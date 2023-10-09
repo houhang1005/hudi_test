@@ -86,7 +86,7 @@ public class HoodieCommitMetadata implements Serializable {
     return extraMetadata;
   }
 
-  public Map<String, List<HoodieWriteStat>> getPartitionToWriteStats() {//0717怎么来的
+  public Map<String, List<HoodieWriteStat>> getPartitionToWriteStats() {//0717怎么来的 20230918
     return partitionToWriteStats;
   }
 

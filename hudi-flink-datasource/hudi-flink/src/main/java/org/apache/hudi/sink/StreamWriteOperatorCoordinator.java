@@ -232,7 +232,7 @@ public class StreamWriteOperatorCoordinator
     );
   }
 
-  //可能是cp完成后 调用的最初位置 但是这里的执行在 接受event之后
+  //可能是cp完成后 调用的最初位置 但是这里的执行在 接受event之后.或者说就是precommit完成后的二阶段commit 比如说消费kafka的流程 这里包含的调度才真正异步提交
   @Override
   public void notifyCheckpointComplete(long checkpointId) {
     executor.execute(
@@ -242,7 +242,7 @@ public class StreamWriteOperatorCoordinator
           Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
           // for streaming mode, commits the ever received events anyway,
           // the stream write task snapshot and flush the data buffer synchronously in sequence,
-          // so a successful checkpoint subsumes the old one(follows the checkpoint subsuming contract)
+          // so a successful checkpoint subsumes(归入) the old one(follows the checkpoint subsuming contract)
           final boolean committed = commitInstant(this.instant, checkpointId);//下一步处理WriteMetadataEvent[]  handleWriteMetaEvent提前已经处理并更新了 WriteMetadataEvent[]
           LOG.info("CUR notifyCheckpointComplete INSTANT IS "+ this.instant);
           if (tableState.scheduleCompaction) { //deltacommit写入的cp完成后 根据配置来决定是否生成压缩计划
@@ -271,7 +271,7 @@ public class StreamWriteOperatorCoordinator
   }
 
   @Override
-  public void handleEventFromOperator(int i, OperatorEvent operatorEvent) {//处理每次cp发送来的event 也就是WriteMetaEvent
+  public void handleEventFromOperator(int i, OperatorEvent operatorEvent) {//处理每次cp发送来的event 也就是WriteMetaEvent 不确定谁在调用
     ValidationUtils.checkState(operatorEvent instanceof WriteMetadataEvent,
         "The coordinator can only handle WriteMetaEvent");
     WriteMetadataEvent event = (WriteMetadataEvent) operatorEvent;
@@ -366,7 +366,7 @@ public class StreamWriteOperatorCoordinator
         .allMatch(event -> event != null && event.isLastBatch());
   }
 
-  private void addEventToBuffer(WriteMetadataEvent event) {//相同的taskid在数组里存在过了就用mergewith
+  private void addEventToBuffer(WriteMetadataEvent event) {//相同的taskid在数组里存在过了就用mergewith 即event放入eventBuffer[]数组
     if (this.eventBuffer[event.getTaskID()] != null) {
       this.eventBuffer[event.getTaskID()].mergeWith(event);
     } else {
@@ -443,7 +443,7 @@ public class StreamWriteOperatorCoordinator
     }
   }
 
-  private void handleWriteMetaEvent(WriteMetadataEvent event) {//可能是接收 sendEventToCoordinator(event) 并写入eventbuffer
+  private void handleWriteMetaEvent(WriteMetadataEvent event) {//可能是接收 sendEventToCoordinator(event) 并写入eventBuffer[]数组
     // the write task does not block after checkpointing(and before it receives a checkpoint success event),
     // if it checkpoints succeed then flushes the data buffer again before this coordinator receives a checkpoint
     // success event, the data buffer would flush with an older instant time.

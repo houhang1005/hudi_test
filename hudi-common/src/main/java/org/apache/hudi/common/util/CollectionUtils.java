@@ -134,6 +134,7 @@ public class CollectionUtils {
    *
    * NOTE: That values associated with overlapping keys from the second map, will override
    *       values from the first one
+   *       后面的覆盖前面的map
    */
   public static <K, V> HashMap<K, V> combine(Map<K, V> one, Map<K, V> another) {
     HashMap<K, V> combined = new HashMap<>(one.size() + another.size());

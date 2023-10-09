@@ -95,7 +95,7 @@ public abstract class HoodieFlinkTable<T extends HoodieRecordPayload>
   @Override
   public <T extends SpecificRecordBase> Option<HoodieTableMetadataWriter> getMetadataWriter(String triggeringInstantTimestamp,
                                                                                             Option<T> actionMetadata) {//开了metatable 则创建一个metadatawriter
-    if (config.isMetadataTableEnabled()) {
+    if (config.isMetadataTableEnabled()) {//建表时是否指定了开启metadatatable
       return Option.of(FlinkHoodieBackedTableMetadataWriter.create(context.getHadoopConf().get(), config,
           context, actionMetadata, Option.of(triggeringInstantTimestamp)));
     } else {

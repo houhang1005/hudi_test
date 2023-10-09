@@ -81,7 +81,7 @@ public class CommitUtils {
                                                    WriteOperationType operationType,
                                                    String schemaToStoreInCommit,
                                                    String commitActionType) {
-    //commitMetadata 包含了Map<String, List<HoodieWriteStat>> partitionToWriteStats
+    //commitMetadata 包含了Map<String, List<HoodieWriteStat>> partitionToWriteStats 从send的event里获取到的status 这里转为HoodieCommitMetadata
     HoodieCommitMetadata commitMetadata = buildMetadataFromStats(writeStats, partitionToReplaceFileIds, commitActionType, operationType);
 
     // add in extra metadata

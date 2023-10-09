@@ -745,7 +745,7 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
       String partitionPath = formatPartitionKey(partitionStr);
       ensurePartitionLoadedCorrectly(partitionPath);
       return fetchLatestFileSlices(partitionPath)
-          .filter(slice -> !isFileGroupReplaced(slice.getFileGroupId()))
+          .filter(slice -> !isFileGroupReplaced(slice.getFileGroupId()))//不存在时才要？
           .flatMap(slice -> this.filterBaseFileAfterPendingCompaction(slice, true))
           .map(this::addBootstrapBaseFileIfPresent);
     } finally {
